@@ -26,8 +26,21 @@ export interface BoardHighlight {
   to?: string;
 }
 
-function squareColor(file: number, rank: number): string {
-  return (file + rank) % 2 === 0 ? LIGHT : DARK;
+/** chess.js row index for a chess rank (0 = 1st rank). */
+export function boardRowForRank(chessRank: number): number {
+  return 7 - chessRank;
+}
+
+export function isDarkSquare(file: number, chessRank: number): boolean {
+  return (file + chessRank) % 2 === 0;
+}
+
+export function displayYForRank(chessRank: number, cell: number): number {
+  return (7 - chessRank) * cell;
+}
+
+function squareColor(file: number, chessRank: number): string {
+  return isDarkSquare(file, chessRank) ? DARK : LIGHT;
 }
 
 function parseSquare(sq: string): { file: number; rank: number } | null {
@@ -78,7 +91,7 @@ export function renderChessBoard(
   for (let rank = 7; rank >= 0; rank -= 1) {
     for (let file = 0; file < 8; file += 1) {
       const x = file * cell;
-      const y = (7 - rank) * cell;
+      const y = displayYForRank(rank, cell);
       const rect = document.createElementNS(svgNs, "rect");
       rect.setAttribute("x", String(x));
       rect.setAttribute("y", String(y));
@@ -97,7 +110,7 @@ export function renderChessBoard(
     }
     const rect = document.createElementNS(svgNs, "rect");
     rect.setAttribute("x", String(sq.file * cell));
-    rect.setAttribute("y", String((7 - sq.rank) * cell));
+    rect.setAttribute("y", String(displayYForRank(sq.rank, cell)));
     rect.setAttribute("width", String(cell));
     rect.setAttribute("height", String(cell));
     rect.setAttribute("fill", from && to ? LAST_MOVE : HIGHLIGHT);
@@ -106,7 +119,7 @@ export function renderChessBoard(
 
   for (let rank = 7; rank >= 0; rank -= 1) {
     for (let file = 0; file < 8; file += 1) {
-      const piece = board[rank]?.[file];
+      const piece = board[boardRowForRank(rank)]?.[file];
       if (!piece) {
         continue;
       }
@@ -117,7 +130,7 @@ export function renderChessBoard(
       }
       const text = document.createElementNS(svgNs, "text");
       text.setAttribute("x", String(file * cell + cell / 2));
-      text.setAttribute("y", String((7 - rank) * cell + cell * 0.68));
+      text.setAttribute("y", String(displayYForRank(rank, cell) + cell * 0.68));
       text.setAttribute("text-anchor", "middle");
       text.setAttribute("font-size", String(cell * 0.78));
       text.setAttribute(

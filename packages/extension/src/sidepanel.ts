@@ -17,6 +17,7 @@ import { MVP_ENGINE_ID, MVP_GO_COMMAND, MVP_NODES_PER_POSITION } from "./budgetD
 import { reviewGameWithEngine } from "./reviewWithEngine.ts";
 import { getCachedReview, putCachedReview } from "./reviewCache.ts";
 import { formatReviewError } from "./reviewErrors.ts";
+import { fullMoveCount } from "./gameMoves.ts";
 import {
   GameReviewPanel,
   queryGameReviewPanel,
@@ -139,7 +140,7 @@ function showGameSummary(game: NormalizedGame): void {
     gameResultEl.textContent = `Resultado: ${game.result}`;
   }
   if (gameMovesCountEl instanceof HTMLElement) {
-    gameMovesCountEl.textContent = `Jogadas: ${game.moves.length}`;
+    gameMovesCountEl.textContent = `Jogadas: ${fullMoveCount(game.moves.length)}`;
   }
 }
 
