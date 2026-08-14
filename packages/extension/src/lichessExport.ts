@@ -11,6 +11,11 @@ export interface LichessExportJson {
   status: LichessGameStatus;
   winner?: string;
   moves?: string;
+  createdAt?: number;
+  clock?: {
+    initial?: number;
+    increment?: number;
+  };
   players?: {
     white?: { user?: { name?: string }; rating?: number };
     black?: { user?: { name?: string }; rating?: number };

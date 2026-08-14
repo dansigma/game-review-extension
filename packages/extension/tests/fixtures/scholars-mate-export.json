@@ -1,0 +1,14 @@
+{
+  "id": "fixture1",
+  "variant": "standard",
+  "speed": "blitz",
+  "status": "mate",
+  "winner": "white",
+  "moves": "e2e4 e7e5 d1h5 b8c6 f1c4 g8f6 h5f7",
+  "clock": { "initial": 300, "increment": 0 },
+  "createdAt": 1735689600000,
+  "players": {
+    "white": { "user": { "name": "Alice" }, "rating": 1500 },
+    "black": { "user": { "name": "Bob" }, "rating": 1480 }
+  }
+}

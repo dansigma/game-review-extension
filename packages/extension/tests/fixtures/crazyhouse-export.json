@@ -1,0 +1,12 @@
+{
+  "id": "crazy123",
+  "variant": "crazyhouse",
+  "speed": "rapid",
+  "status": "mate",
+  "winner": "white",
+  "moves": "e2e4 e7e5",
+  "players": {
+    "white": { "user": { "name": "White" } },
+    "black": { "user": { "name": "Black" } }
+  }
+}
