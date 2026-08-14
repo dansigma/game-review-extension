@@ -12,9 +12,11 @@ import {
   type EnginePort,
 } from "./enginePort.ts";
 import type { NormalizedGame } from "@game-review/core";
-import { parsePgn } from "@game-review/core";
-import { MVP_GO_COMMAND } from "./budgetDecision.ts";
+import { ALGO_VERSION, parsePgn } from "@game-review/core";
+import { MVP_ENGINE_ID, MVP_GO_COMMAND, MVP_NODES_PER_POSITION } from "./budgetDecision.ts";
 import { reviewGameWithEngine } from "./reviewWithEngine.ts";
+import { getCachedReview, putCachedReview } from "./reviewCache.ts";
+import { formatReviewError } from "./reviewErrors.ts";
 import {
   GameReviewPanel,
   queryGameReviewPanel,
@@ -39,6 +41,31 @@ let analysisEngine: EnginePort | null = null;
 let analysisAbort: AbortController | null = null;
 
 const reviewPanel = new GameReviewPanel(queryGameReviewPanel(document));
+
+function reviewCacheParams(gameId: string) {
+  return {
+    gameId,
+    algoVersion: ALGO_VERSION,
+    engineId: MVP_ENGINE_ID,
+    nodesPerPosition: MVP_NODES_PER_POSITION,
+  };
+}
+
+async function tryShowCachedReview(game: NormalizedGame): Promise<boolean> {
+  try {
+    const cached = await getCachedReview(reviewCacheParams(game.gameId));
+    if (!cached) {
+      return false;
+    }
+    reviewPanel.showReview(cached, game);
+    setStatus("Análise em cache");
+    log(`cache hit ${game.gameId}`);
+    return true;
+  } catch (error: unknown) {
+    log(`cache read failed: ${formatReviewError(error)}`);
+    return false;
+  }
+}
 
 function log(message: string): void {
   if (!(logEl instanceof HTMLElement)) {
@@ -134,12 +161,15 @@ async function loadActiveGame(): Promise<void> {
     loadedGame = game;
     showGameSummary(game);
     reviewPanel.setGame(game);
-    setStatus(`Partida ${game.gameId} carregada`);
+    const fromCache = await tryShowCachedReview(game);
+    if (!fromCache) {
+      setStatus(`Partida ${game.gameId} carregada`);
+    }
     log(
       `loaded ${game.gameId}: ${game.players.white.name} vs ${game.players.black.name}, ${game.result}, ${game.moves.length} plies`,
     );
   } catch (error: unknown) {
-    const text = error instanceof Error ? error.message : String(error);
+    const text = formatReviewError(error);
     showLoadError(text);
     setStatus("Falha ao carregar partida");
     log(`load failed: ${text}`);
@@ -342,6 +372,15 @@ async function runGameReview(): Promise<void> {
   }
 
   const game = loadedGame;
+
+  const cached = await getCachedReview(reviewCacheParams(game.gameId));
+  if (cached) {
+    reviewPanel.showReview(cached, game);
+    setStatus("Carregada do cache");
+    log(`cache hit ${game.gameId} (analyze skipped)`);
+    return;
+  }
+
   const total = game.moves.length + 1;
   analysisAbort = new AbortController();
   const { signal } = analysisAbort;
@@ -360,6 +399,13 @@ async function runGameReview(): Promise<void> {
         setStatus(`Analisando… ${done}/${progressTotal}`);
       },
     });
+    if (signal.aborted) {
+      reviewPanel.showAnalyzeReady();
+      setStatus("Análise cancelada");
+      log("analysis cancelled");
+      return;
+    }
+    await putCachedReview(review);
     reviewPanel.showReview(review, game);
     setStatus("Análise concluída");
     log(
@@ -372,9 +418,9 @@ async function runGameReview(): Promise<void> {
       log("analysis cancelled");
       return;
     }
-    const text = error instanceof Error ? error.message : String(error);
+    const text = formatReviewError(error);
     reviewPanel.showAnalyzeReady();
-    setStatus("Falha na análise");
+    setStatus(text);
     log(`analysis failed: ${text}`);
   } finally {
     analysisEngine?.dispose();
