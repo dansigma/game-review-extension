@@ -339,6 +339,12 @@
 
       <section id="review-section" hidden>
         <h2>Revisão</h2>
+        <label for="engine-quality-preset">Qualidade do motor</label>
+        <select id="engine-quality-preset" aria-label="Qualidade do motor">
+          <option value="fast">Rápido</option>
+          <option value="standard" selected>Padrão (80k)</option>
+          <option value="deep">Profundo</option>
+        </select>
         <button id="analyze-game" type="button" class="primary">Analisar partida</button>
         <div id="analysis-progress" hidden>
           <div class="progress-row">

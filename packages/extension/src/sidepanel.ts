@@ -18,10 +18,11 @@ import {
   type EnginePort,
 } from "./enginePort.ts";
 import type { NormalizedGame } from "@game-review/core";
-import { ALGO_VERSION, parsePgn } from "@game-review/core";
-import { MVP_ENGINE_ID, MVP_GO_COMMAND, MVP_NODES_PER_POSITION } from "./budgetDecision.ts";
+import { parsePgn } from "@game-review/core";
+import { MVP_GO_COMMAND } from "./budgetDecision.ts";
 import { reviewGameWithEngine } from "./reviewWithEngine.ts";
 import { getCachedReview, putCachedReview } from "./reviewCache.ts";
+import { reviewCacheParams } from "./reviewCacheParams.ts";
 import { formatReviewError } from "./reviewErrors.ts";
 import { fullMoveCount } from "./gameMoves.ts";
 import {
@@ -53,18 +54,13 @@ let analysisAbort: AbortController | null = null;
 
 const reviewPanel = new GameReviewPanel(queryGameReviewPanel(document));
 
-function reviewCacheParams(gameId: string) {
-  return {
-    gameId,
-    algoVersion: ALGO_VERSION,
-    engineId: MVP_ENGINE_ID,
-    nodesPerPosition: MVP_NODES_PER_POSITION,
-  };
+function selectedReviewCacheParams(gameId: string) {
+  return reviewCacheParams(gameId, reviewPanel.getNodesPerPosition());
 }
 
 async function tryShowCachedReview(game: NormalizedGame): Promise<boolean> {
   try {
-    const cached = await getCachedReview(reviewCacheParams(game.gameId));
+    const cached = await getCachedReview(selectedReviewCacheParams(game.gameId));
     if (!cached) {
       return false;
     }
@@ -463,8 +459,9 @@ async function runGameReview(): Promise<void> {
   }
 
   const game = loadedGame;
+  const nodesPerPosition = reviewPanel.getNodesPerPosition();
 
-  const cached = await getCachedReview(reviewCacheParams(game.gameId));
+  const cached = await getCachedReview(selectedReviewCacheParams(game.gameId));
   if (cached) {
     reviewPanel.showReview(cached, game);
     setStatus("Carregada do cache");
@@ -484,6 +481,7 @@ async function runGameReview(): Promise<void> {
     await analysisEngine.init();
     const review = await reviewGameWithEngine(analysisEngine, {
       game,
+      nodesPerPosition,
       signal,
       onProgress: (done, progressTotal) => {
         reviewPanel.showAnalyzing(done, progressTotal);
@@ -527,7 +525,22 @@ reviewPanel.setHandlers({
   onCancel: () => {
     cancelAnalysis();
   },
+  onPresetChange: () => {
+    void onEnginePresetChanged();
+  },
 });
+
+async function onEnginePresetChanged(): Promise<void> {
+  if (!loadedGame || analysisEngine) {
+    return;
+  }
+  const fromCache = await tryShowCachedReview(loadedGame);
+  if (!fromCache) {
+    reviewPanel.showAnalyzeReady({ hideResults: true });
+    setStatus(`Partida ${loadedGame.gameId} carregada`);
+    log(`preset ${reviewPanel.getPreset()} (${reviewPanel.getNodesPerPosition()} nodes): cache miss`);
+  }
+}
 
 window.addEventListener("beforeunload", () => {
   cancelAnalysis();
