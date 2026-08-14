@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { PgnParseError } from "@game-review/core";
 import { LIVE_GAME_MESSAGE_PT } from "../src/lichessProvider.ts";
+import {
+  EMPTY_PGN_MESSAGE_PT,
+  MULTI_GAME_MESSAGE_PT,
+  PgnProviderError,
+} from "../src/pgnProvider.ts";
 import {
   ENGINE_LOAD_ERROR_PT,
   formatLichessExportHttpError,
@@ -47,6 +53,21 @@ describe("formatReviewError", () => {
     );
     expect(formatReviewError(new Error("NNUE file missing"))).toBe(
       ENGINE_LOAD_ERROR_PT,
+    );
+  });
+
+  it("maps PGN provider and parse errors to PT", () => {
+    expect(formatReviewError(new PgnProviderError(EMPTY_PGN_MESSAGE_PT))).toBe(
+      EMPTY_PGN_MESSAGE_PT,
+    );
+    expect(formatReviewError(new PgnProviderError(MULTI_GAME_MESSAGE_PT))).toBe(
+      MULTI_GAME_MESSAGE_PT,
+    );
+    expect(formatReviewError(new PgnParseError("Unsupported variant: Crazyhouse"))).toBe(
+      "Variante não suportada: Crazyhouse",
+    );
+    expect(formatReviewError(new PgnParseError("bad movetext"))).toBe(
+      "PGN inválido: bad movetext",
     );
   });
 });

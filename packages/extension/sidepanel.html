@@ -61,13 +61,23 @@
         font-family: ui-monospace, monospace;
       }
       button,
-      input {
+      input,
+      textarea {
         font: inherit;
         padding: 6px 10px;
         border-radius: 6px;
         border: 1px solid #444;
         background: #111;
         color: var(--text);
+      }
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        resize: vertical;
+        min-height: 96px;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        line-height: 1.4;
       }
       button {
         cursor: pointer;
@@ -221,7 +231,7 @@
     <main>
       <header>
         <h1>Análise de partida</h1>
-        <p>Pós-partida no Lichess. Motor local no Side Panel.</p>
+        <p>Pós-partida no Lichess ou PGN colado. Motor local no Side Panel.</p>
         <p class="status">Estado: <strong id="status">Aguardando</strong></p>
       </header>
 
@@ -231,6 +241,13 @@
         <div class="game-id-value" id="active-game-id">—</div>
         <div class="row">
           <button id="load-game" type="button" disabled>Carregar partida</button>
+        </div>
+        <p id="pgn-hint">Ou cole um PGN / abra um arquivo .pgn ou .txt:</p>
+        <textarea id="pgn-input" placeholder="Cole o PGN aqui…" spellcheck="false"></textarea>
+        <div class="row">
+          <button id="load-pgn" type="button">Carregar PGN</button>
+          <input id="pgn-file" type="file" accept=".pgn,.txt,text/plain" hidden />
+          <button id="pgn-file-button" type="button">Abrir arquivo</button>
         </div>
         <div id="game-summary" hidden>
           <p id="game-players"></p>

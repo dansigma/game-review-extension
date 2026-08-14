@@ -1,5 +1,7 @@
+import { PgnParseError } from "@game-review/core";
 import { formatLichessExportHttpError } from "./lichessExport.ts";
 import { LichessProviderError } from "./lichessProvider.ts";
+import { PgnProviderError } from "./pgnProvider.ts";
 
 export { formatLichessExportHttpError };
 
@@ -17,9 +19,31 @@ function isEngineLoadFailure(message: string): boolean {
   );
 }
 
+function formatPgnParseError(error: PgnParseError): string {
+  if (error.message === "PGN is empty") {
+    return "PGN vazio";
+  }
+  if (error.message === "Only standard chess is supported in the MVP") {
+    return "Apenas xadrez padrão é suportado";
+  }
+  const variantMatch = /^Unsupported variant: (.+)$/.exec(error.message);
+  if (variantMatch?.[1]) {
+    return `Variante não suportada: ${variantMatch[1]}`;
+  }
+  return `PGN inválido: ${error.message}`;
+}
+
 export function formatReviewError(error: unknown): string {
   if (error instanceof LichessProviderError) {
     return error.message;
+  }
+
+  if (error instanceof PgnProviderError) {
+    return error.message;
+  }
+
+  if (error instanceof PgnParseError) {
+    return formatPgnParseError(error);
   }
 
   const text = error instanceof Error ? error.message : String(error);

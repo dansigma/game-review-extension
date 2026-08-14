@@ -5,6 +5,12 @@ import {
   type LichessExportJson,
 } from "./lichessExport.ts";
 import { loadLichessGame } from "./lichessProvider.ts";
+import { loadPgnGame } from "./pgnProvider.ts";
+import {
+  gameCardHint,
+  isLichessSessionGameId,
+  type GameLoadSource,
+} from "./gameCardDisplay.ts";
 import type { ActiveGameData } from "./messages.ts";
 import {
   createEnginePort,
@@ -29,6 +35,10 @@ const activeGameIdEl = document.querySelector("#active-game-id");
 const gameIdHintEl = document.querySelector("#game-id-hint");
 const gameIdInput = document.querySelector("#game-id");
 const loadGameButton = document.querySelector("#load-game");
+const pgnInput = document.querySelector("#pgn-input");
+const loadPgnButton = document.querySelector("#load-pgn");
+const pgnFileInput = document.querySelector("#pgn-file");
+const pgnFileButton = document.querySelector("#pgn-file-button");
 const gameSummaryEl = document.querySelector("#game-summary");
 const gamePlayersEl = document.querySelector("#game-players");
 const gameResultEl = document.querySelector("#game-result");
@@ -77,24 +87,31 @@ function log(message: string): void {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-function setActiveGameId(gameId: string | null): void {
+function setSessionLichessGameId(gameId: string | null): void {
   activeGameId = gameId;
   if (activeGameIdEl instanceof HTMLElement) {
     activeGameIdEl.textContent = gameId ?? "—";
   }
   if (gameIdHintEl instanceof HTMLElement) {
-    gameIdHintEl.textContent = gameId
-      ? "Partida selecionada na página do Lichess."
-      : "Abra uma partida no Lichess e use o botão na página.";
+    gameIdHintEl.textContent = gameCardHint(gameId ? "lichess" : null);
   }
   if (gameIdInput instanceof HTMLInputElement && gameId) {
     gameIdInput.value = gameId;
   }
   if (loadGameButton instanceof HTMLButtonElement) {
-    loadGameButton.disabled = !gameId;
+    loadGameButton.disabled = !isLichessSessionGameId(gameId);
   }
   if (!gameId) {
     clearGameSummary();
+  }
+}
+
+function showLoadedGameCard(gameId: string, source: GameLoadSource): void {
+  if (activeGameIdEl instanceof HTMLElement) {
+    activeGameIdEl.textContent = gameId;
+  }
+  if (gameIdHintEl instanceof HTMLElement) {
+    gameIdHintEl.textContent = gameCardHint(source);
   }
 }
 
@@ -151,29 +168,51 @@ async function fetchLichessExport(gameId: string): Promise<LichessExportJson> {
   })) as LichessExportJson;
 }
 
+async function finishLoadingGame(
+  game: NormalizedGame,
+  source: GameLoadSource,
+): Promise<void> {
+  showLoadedGameCard(game.gameId, source);
+  loadedGame = game;
+  showGameSummary(game);
+  reviewPanel.setGame(game);
+  const fromCache = await tryShowCachedReview(game);
+  if (!fromCache) {
+    setStatus(`Partida ${game.gameId} carregada`);
+  }
+  log(
+    `loaded ${game.gameId}: ${game.players.white.name} vs ${game.players.black.name}, ${game.result}, ${game.moves.length} plies`,
+  );
+}
+
 async function loadActiveGame(): Promise<void> {
-  if (!activeGameId) {
+  if (!isLichessSessionGameId(activeGameId)) {
     return;
   }
   setStatus(`Carregando ${activeGameId}…`);
   clearGameSummary();
   try {
     const game = await loadLichessGame(activeGameId, fetchLichessExport);
-    loadedGame = game;
-    showGameSummary(game);
-    reviewPanel.setGame(game);
-    const fromCache = await tryShowCachedReview(game);
-    if (!fromCache) {
-      setStatus(`Partida ${game.gameId} carregada`);
-    }
-    log(
-      `loaded ${game.gameId}: ${game.players.white.name} vs ${game.players.black.name}, ${game.result}, ${game.moves.length} plies`,
-    );
+    await finishLoadingGame(game, "lichess");
   } catch (error: unknown) {
     const text = formatReviewError(error);
     showLoadError(text);
     setStatus("Falha ao carregar partida");
     log(`load failed: ${text}`);
+  }
+}
+
+async function loadFromPgn(pgn: string): Promise<void> {
+  setStatus("Carregando PGN…");
+  clearGameSummary();
+  try {
+    const game = loadPgnGame(pgn);
+    await finishLoadingGame(game, "pgn");
+  } catch (error: unknown) {
+    const text = formatReviewError(error);
+    showLoadError(text);
+    setStatus("Falha ao carregar PGN");
+    log(`pgn load failed: ${text}`);
   }
 }
 
@@ -196,7 +235,7 @@ async function loadActiveGameFromSession(): Promise<void> {
   if (response && response.ok === true) {
     const data = response.data as ActiveGameData | null;
     if (data?.gameId) {
-      setActiveGameId(data.gameId);
+      setSessionLichessGameId(data.gameId);
       setStatus(`Partida ${data.gameId}`);
       maybeAutoLoadGame(data.gameId);
       return;
@@ -208,7 +247,7 @@ async function loadActiveGameFromSession(): Promise<void> {
     if (!fromTab) {
       return;
     }
-    setActiveGameId(fromTab);
+    setSessionLichessGameId(fromTab);
     setStatus(`Partida ${fromTab}`);
     maybeAutoLoadGame(fromTab);
   } catch (error: unknown) {
@@ -222,7 +261,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
   const next = changes.activeGameId.newValue;
   if (typeof next === "string" && next.length > 0) {
-    setActiveGameId(next);
+    setSessionLichessGameId(next);
     setStatus(`Partida ${next}`);
     maybeAutoLoadGame(next);
   }
@@ -376,6 +415,39 @@ async function runBudget(args: {
 
 loadGameButton?.addEventListener("click", () => {
   void loadActiveGame();
+});
+
+loadPgnButton?.addEventListener("click", () => {
+  const raw = pgnInput instanceof HTMLTextAreaElement ? pgnInput.value : "";
+  void loadFromPgn(raw);
+});
+
+pgnFileButton?.addEventListener("click", () => {
+  if (pgnFileInput instanceof HTMLInputElement) {
+    pgnFileInput.click();
+  }
+});
+
+pgnFileInput?.addEventListener("change", () => {
+  if (!(pgnFileInput instanceof HTMLInputElement)) {
+    return;
+  }
+  const file = pgnFileInput.files?.[0];
+  if (!file) {
+    return;
+  }
+  void file
+    .text()
+    .then((text) => loadFromPgn(text))
+    .catch((error: unknown) => {
+      const text = formatReviewError(error);
+      showLoadError(text);
+      setStatus("Falha ao ler arquivo");
+      log(`pgn file read failed: ${text}`);
+    })
+    .finally(() => {
+      pgnFileInput.value = "";
+    });
 });
 
 function cancelAnalysis(): void {
