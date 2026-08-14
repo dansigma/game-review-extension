@@ -1,0 +1,8 @@
+Chess piece SVGs in this directory are the Cburnett set
+(https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces).
+
+Author: Wikimedia user Cburnett
+License (choice of): CC BY-SA 3.0, GPL, BSD, or GFDL.
+This project uses them under GPL, matching the extension license (GPL-3.0-only).
+
+Not chessground. Artwork only.

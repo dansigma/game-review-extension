@@ -185,16 +185,34 @@ function maybeAutoLoadGame(gameId: string): void {
   void loadActiveGame();
 }
 
+async function gameIdFromActiveTab(): Promise<string | undefined> {
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const url = tabs[0]?.url;
+  return url ? extractGameId(url) : undefined;
+}
+
 async function loadActiveGameFromSession(): Promise<void> {
   const response = await chrome.runtime.sendMessage({ type: "get-active-game" });
-  if (!response || response.ok !== true) {
-    return;
+  if (response && response.ok === true) {
+    const data = response.data as ActiveGameData | null;
+    if (data?.gameId) {
+      setActiveGameId(data.gameId);
+      setStatus(`Partida ${data.gameId}`);
+      maybeAutoLoadGame(data.gameId);
+      return;
+    }
   }
-  const data = response.data as ActiveGameData | null;
-  if (data?.gameId) {
-    setActiveGameId(data.gameId);
-    setStatus(`Partida ${data.gameId}`);
-    maybeAutoLoadGame(data.gameId);
+
+  try {
+    const fromTab = await gameIdFromActiveTab();
+    if (!fromTab) {
+      return;
+    }
+    setActiveGameId(fromTab);
+    setStatus(`Partida ${fromTab}`);
+    maybeAutoLoadGame(fromTab);
+  } catch (error: unknown) {
+    log(`tab game id: ${formatReviewError(error)}`);
   }
 }
 
