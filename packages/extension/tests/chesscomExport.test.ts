@@ -80,6 +80,15 @@ describe("chesscomExport", () => {
     expect(gameUrlMatchesRef(found!.url, "live", "142074276742")).toBe(true);
   });
 
+  it("does not match a longer game id as a suffix", () => {
+    expect(
+      gameUrlMatchesRef("https://www.chess.com/game/live/99123", "live", "123"),
+    ).toBe(false);
+    expect(
+      gameUrlMatchesRef("https://www.chess.com/analysis/game/live/99123", "live", "123"),
+    ).toBe(false);
+  });
+
   it("loads minimized callback fixture shape", () => {
     const callback = fixture<ChesscomCallbackJson>("chesscom-finished-callback.json");
     expect(callback.game?.isFinished).toBe(true);

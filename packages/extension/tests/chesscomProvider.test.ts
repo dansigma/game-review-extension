@@ -29,6 +29,10 @@ describe("chesscomProvider", () => {
     const callback = fixture<ChesscomCallbackJson>("chesscom-finished-callback.json");
     const archive = fixture<ChesscomArchiveJson>("chesscom-finished-archive.json");
 
+    expect(callback.game?.pgnHeaders?.SetUp).toBe("1");
+    expect(callback.game?.pgnHeaders?.FEN).toBe(STANDARD_START_FEN);
+    expect(() => assertReviewableChesscomCallback(callback)).not.toThrow();
+
     const game = await loadChesscomGameFromSources(
       { kind: "live", id: "142074276742" },
       async () => callback,

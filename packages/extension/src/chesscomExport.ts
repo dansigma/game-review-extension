@@ -104,12 +104,12 @@ export function gameUrlMatchesRef(
   kind: ChesscomGameKind,
   id: string,
 ): boolean {
-  const lower = gameUrl.toLowerCase();
-  return (
-    lower.includes(`/game/${kind}/${id}`) ||
-    lower.includes(`/analysis/game/${kind}/${id}`) ||
-    lower.endsWith(`/${id}`)
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `/game/${kind}/${escapedId}(?:[/?#]|$)|/analysis/game/${kind}/${escapedId}(?:[/?#]|$)`,
+    "i",
   );
+  return pattern.test(gameUrl);
 }
 
 export function parseArchiveDate(dateHeader: string | undefined): { year: number; month: number } | undefined {

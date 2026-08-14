@@ -8,6 +8,8 @@
       "Black": "BobChess",
       "Date": "2024.03.15",
       "Result": "1-0",
+      "SetUp": "1",
+      "FEN": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       "WhiteElo": "1500",
       "BlackElo": "1400",
       "TimeControl": "300"

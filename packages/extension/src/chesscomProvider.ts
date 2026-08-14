@@ -1,4 +1,4 @@
-import { parsePgn, type NormalizedGame } from "@game-review/core";
+import { parsePgn, STANDARD_START_FEN, type NormalizedGame } from "@game-review/core";
 import {
   ARCHIVE_NOT_READY_MESSAGE_PT,
   findArchiveGame,
@@ -34,6 +34,17 @@ function normalizeUsername(value: string | undefined): string | undefined {
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
+function normalizeFen(fen: string): string {
+  return fen.trim().replace(/\s+/g, " ");
+}
+
+function isStandardStartFen(fen: string | undefined): boolean {
+  if (!fen?.trim()) {
+    return true;
+  }
+  return normalizeFen(fen) === normalizeFen(STANDARD_START_FEN);
+}
+
 function isStandardChessCallback(json: ChesscomCallbackJson): boolean {
   const type = json.game?.type?.toLowerCase();
   if (type && type !== "chess") {
@@ -48,7 +59,7 @@ function isStandardChessCallback(json: ChesscomCallbackJson): boolean {
 
   const setup = headers?.SetUp?.trim();
   if (setup === "1") {
-    return false;
+    return isStandardStartFen(headers?.FEN);
   }
 
   return true;
