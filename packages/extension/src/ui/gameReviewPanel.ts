@@ -15,6 +15,7 @@ import {
   nodesForPreset,
   type EngineQualityPresetId,
 } from "../budgetDecision.ts";
+import { formatAnalysisProgressLabel } from "../analysisEta.ts";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
 import { renderEvalGraph } from "./evalGraph.ts";
 
@@ -31,6 +32,7 @@ export interface GameReviewPanelElements {
   reviewSection: HTMLElement;
   presetSelect: HTMLSelectElement;
   analyzeButton: HTMLButtonElement;
+  reanalyzeButton: HTMLButtonElement;
   progressBlock: HTMLElement;
   progressBar: HTMLProgressElement;
   progressLabel: HTMLElement;
@@ -61,6 +63,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
 
   const presetSelect = root.querySelector("#engine-quality-preset");
   const analyzeButton = root.querySelector("#analyze-game");
+  const reanalyzeButton = root.querySelector("#reanalyze-game");
   const cancelButton = root.querySelector("#cancel-analysis");
   const progressBar = root.querySelector("#analysis-progress-bar");
   const navPrev = root.querySelector("#nav-prev");
@@ -73,6 +76,9 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
   }
   if (!(analyzeButton instanceof HTMLButtonElement)) {
     throw new Error("Missing #analyze-game");
+  }
+  if (!(reanalyzeButton instanceof HTMLButtonElement)) {
+    throw new Error("Missing #reanalyze-game");
   }
   if (!(cancelButton instanceof HTMLButtonElement)) {
     throw new Error("Missing #cancel-analysis");
@@ -102,6 +108,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     reviewSection: requireEl("#review-section"),
     presetSelect,
     analyzeButton,
+    reanalyzeButton,
     progressBlock: requireEl("#analysis-progress"),
     progressBar,
     progressLabel: requireEl("#analysis-progress-label"),
@@ -127,11 +134,13 @@ export class GameReviewPanel {
   private review: GameReview | null = null;
   private currentPly = -1;
   private onAnalyze: (() => void) | null = null;
+  private onReanalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
   private onPresetChange: (() => void) | null = null;
 
   constructor(private readonly el: GameReviewPanelElements) {
     el.analyzeButton.addEventListener("click", () => this.onAnalyze?.());
+    el.reanalyzeButton.addEventListener("click", () => this.onReanalyze?.());
     el.cancelButton.addEventListener("click", () => this.onCancel?.());
     el.presetSelect.addEventListener("change", () => this.onPresetChange?.());
     el.navPrev.addEventListener("click", () => this.step(-1));
@@ -147,12 +156,18 @@ export class GameReviewPanel {
 
   setHandlers(handlers: {
     onAnalyze: () => void;
+    onReanalyze: () => void;
     onCancel: () => void;
     onPresetChange: () => void;
   }): void {
     this.onAnalyze = handlers.onAnalyze;
+    this.onReanalyze = handlers.onReanalyze;
     this.onCancel = handlers.onCancel;
     this.onPresetChange = handlers.onPresetChange;
+  }
+
+  getReview(): GameReview | null {
+    return this.review;
   }
 
   getPreset(): EngineQualityPresetId {
@@ -179,20 +194,26 @@ export class GameReviewPanel {
     this.el.presetSelect.disabled = false;
     this.el.analyzeButton.hidden = false;
     this.el.analyzeButton.disabled = false;
+    this.el.reanalyzeButton.hidden = true;
     this.el.progressBlock.hidden = true;
     this.el.resultsBlock.hidden = true;
     this.el.moveList.replaceChildren();
     this.el.boardHost.replaceChildren();
   }
 
-  showAnalyzing(done: number, total: number): void {
+  showAnalyzing(done: number, total: number, remainingMs?: number | null): void {
     this.el.presetSelect.disabled = true;
     this.el.analyzeButton.hidden = true;
+    this.el.reanalyzeButton.hidden = true;
     this.el.progressBlock.hidden = false;
     this.el.resultsBlock.hidden = true;
     this.el.progressBar.max = total;
     this.el.progressBar.value = done;
-    this.el.progressLabel.textContent = `Analisando… ${done}/${total}`;
+    this.el.progressLabel.textContent = formatAnalysisProgressLabel(
+      done,
+      total,
+      remainingMs,
+    );
   }
 
   showReview(review: GameReview, game: NormalizedGame): void {
@@ -202,6 +223,7 @@ export class GameReviewPanel {
     this.el.presetSelect.disabled = false;
     this.el.progressBlock.hidden = true;
     this.el.analyzeButton.hidden = true;
+    this.el.reanalyzeButton.hidden = false;
     this.el.resultsBlock.hidden = false;
     this.renderSummary();
     this.renderCriticalMoments();
@@ -214,6 +236,7 @@ export class GameReviewPanel {
     this.el.progressBlock.hidden = true;
     this.el.analyzeButton.hidden = false;
     this.el.analyzeButton.disabled = false;
+    this.el.reanalyzeButton.hidden = true;
     if (options?.hideResults) {
       this.review = null;
       this.el.resultsBlock.hidden = true;
