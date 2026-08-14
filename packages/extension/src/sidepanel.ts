@@ -17,12 +17,14 @@ import {
   KIWIPETE_FEN,
   type EnginePort,
 } from "./enginePort.ts";
-import type { NormalizedGame } from "@game-review/core";
+import type { NormalizedGame, GameReview } from "@game-review/core";
 import { parsePgn } from "@game-review/core";
 import { MVP_GO_COMMAND } from "./budgetDecision.ts";
 import { reviewGameWithEngine } from "./reviewWithEngine.ts";
 import { getCachedReview, putCachedReview } from "./reviewCache.ts";
 import { reviewCacheParams } from "./reviewCacheParams.ts";
+import { shouldPutCachedReview } from "./analysisCachePolicy.ts";
+import { estimateRemainingMs } from "./analysisEta.ts";
 import { formatReviewError } from "./reviewErrors.ts";
 import { fullMoveCount } from "./gameMoves.ts";
 import {
@@ -450,7 +452,18 @@ function cancelAnalysis(): void {
   analysisAbort?.abort();
 }
 
-async function runGameReview(): Promise<void> {
+function restoreAfterCancelledAnalysis(
+  previousReview: GameReview | null,
+  game: NormalizedGame,
+): void {
+  if (previousReview) {
+    reviewPanel.showReview(previousReview, game);
+  } else {
+    reviewPanel.showAnalyzeReady();
+  }
+}
+
+async function runGameReview(options?: { bypassCache?: boolean }): Promise<void> {
   if (!loadedGame) {
     return;
   }
@@ -460,18 +473,23 @@ async function runGameReview(): Promise<void> {
 
   const game = loadedGame;
   const nodesPerPosition = reviewPanel.getNodesPerPosition();
+  const bypassCache = options?.bypassCache ?? false;
 
-  const cached = await getCachedReview(selectedReviewCacheParams(game.gameId));
-  if (cached) {
-    reviewPanel.showReview(cached, game);
-    setStatus("Carregada do cache");
-    log(`cache hit ${game.gameId} (analyze skipped)`);
-    return;
+  if (!bypassCache) {
+    const cached = await getCachedReview(selectedReviewCacheParams(game.gameId));
+    if (cached) {
+      reviewPanel.showReview(cached, game);
+      setStatus("Carregada do cache");
+      log(`cache hit ${game.gameId} (analyze skipped)`);
+      return;
+    }
   }
 
+  const previousReview = bypassCache ? reviewPanel.getReview() : null;
   const total = game.moves.length + 1;
   analysisAbort = new AbortController();
   const { signal } = analysisAbort;
+  const analysisStartedAt = performance.now();
 
   analysisEngine = createEnginePort(assetBase());
   reviewPanel.showAnalyzing(0, total);
@@ -484,12 +502,14 @@ async function runGameReview(): Promise<void> {
       nodesPerPosition,
       signal,
       onProgress: (done, progressTotal) => {
-        reviewPanel.showAnalyzing(done, progressTotal);
+        const elapsedMs = performance.now() - analysisStartedAt;
+        const remainingMs = estimateRemainingMs(elapsedMs, done, progressTotal);
+        reviewPanel.showAnalyzing(done, progressTotal, remainingMs);
         setStatus(`Analisando… ${done}/${progressTotal}`);
       },
     });
-    if (signal.aborted) {
-      reviewPanel.showAnalyzeReady();
+    if (!shouldPutCachedReview(signal.aborted, review)) {
+      restoreAfterCancelledAnalysis(previousReview, game);
       setStatus("Análise cancelada");
       log("analysis cancelled");
       return;
@@ -502,13 +522,13 @@ async function runGameReview(): Promise<void> {
     );
   } catch (error: unknown) {
     if (signal.aborted) {
-      reviewPanel.showAnalyzeReady();
+      restoreAfterCancelledAnalysis(previousReview, game);
       setStatus("Análise cancelada");
       log("analysis cancelled");
       return;
     }
     const text = formatReviewError(error);
-    reviewPanel.showAnalyzeReady();
+    restoreAfterCancelledAnalysis(previousReview, game);
     setStatus(text);
     log(`analysis failed: ${text}`);
   } finally {
@@ -521,6 +541,9 @@ async function runGameReview(): Promise<void> {
 reviewPanel.setHandlers({
   onAnalyze: () => {
     void runGameReview();
+  },
+  onReanalyze: () => {
+    void runGameReview({ bypassCache: true });
   },
   onCancel: () => {
     cancelAnalysis();
