@@ -9,6 +9,12 @@ import {
   type PlayerColor,
   type ReviewedMove,
 } from "@game-review/core";
+import {
+  DEFAULT_ENGINE_PRESET,
+  isEngineQualityPresetId,
+  nodesForPreset,
+  type EngineQualityPresetId,
+} from "../budgetDecision.ts";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
 import { renderEvalGraph } from "./evalGraph.ts";
 
@@ -23,6 +29,7 @@ const CLASS_CSS: Record<MoveClass, string> = {
 
 export interface GameReviewPanelElements {
   reviewSection: HTMLElement;
+  presetSelect: HTMLSelectElement;
   analyzeButton: HTMLButtonElement;
   progressBlock: HTMLElement;
   progressBar: HTMLProgressElement;
@@ -52,6 +59,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     return el as T;
   };
 
+  const presetSelect = root.querySelector("#engine-quality-preset");
   const analyzeButton = root.querySelector("#analyze-game");
   const cancelButton = root.querySelector("#cancel-analysis");
   const progressBar = root.querySelector("#analysis-progress-bar");
@@ -60,6 +68,9 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
   const navStart = root.querySelector("#nav-start");
   const navEnd = root.querySelector("#nav-end");
 
+  if (!(presetSelect instanceof HTMLSelectElement)) {
+    throw new Error("Missing #engine-quality-preset");
+  }
   if (!(analyzeButton instanceof HTMLButtonElement)) {
     throw new Error("Missing #analyze-game");
   }
@@ -89,6 +100,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
 
   return {
     reviewSection: requireEl("#review-section"),
+    presetSelect,
     analyzeButton,
     progressBlock: requireEl("#analysis-progress"),
     progressBar,
@@ -116,10 +128,12 @@ export class GameReviewPanel {
   private currentPly = -1;
   private onAnalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
+  private onPresetChange: (() => void) | null = null;
 
   constructor(private readonly el: GameReviewPanelElements) {
     el.analyzeButton.addEventListener("click", () => this.onAnalyze?.());
     el.cancelButton.addEventListener("click", () => this.onCancel?.());
+    el.presetSelect.addEventListener("change", () => this.onPresetChange?.());
     el.navPrev.addEventListener("click", () => this.step(-1));
     el.navNext.addEventListener("click", () => this.step(1));
     el.navStart.addEventListener("click", () => this.goToPly(-1));
@@ -134,9 +148,23 @@ export class GameReviewPanel {
   setHandlers(handlers: {
     onAnalyze: () => void;
     onCancel: () => void;
+    onPresetChange: () => void;
   }): void {
     this.onAnalyze = handlers.onAnalyze;
     this.onCancel = handlers.onCancel;
+    this.onPresetChange = handlers.onPresetChange;
+  }
+
+  getPreset(): EngineQualityPresetId {
+    const value = this.el.presetSelect.value;
+    if (isEngineQualityPresetId(value)) {
+      return value;
+    }
+    return DEFAULT_ENGINE_PRESET;
+  }
+
+  getNodesPerPosition(): number {
+    return nodesForPreset(this.getPreset());
   }
 
   setGame(game: NormalizedGame | null): void {
@@ -148,6 +176,7 @@ export class GameReviewPanel {
       return;
     }
     this.el.reviewSection.hidden = false;
+    this.el.presetSelect.disabled = false;
     this.el.analyzeButton.hidden = false;
     this.el.analyzeButton.disabled = false;
     this.el.progressBlock.hidden = true;
@@ -157,6 +186,7 @@ export class GameReviewPanel {
   }
 
   showAnalyzing(done: number, total: number): void {
+    this.el.presetSelect.disabled = true;
     this.el.analyzeButton.hidden = true;
     this.el.progressBlock.hidden = false;
     this.el.resultsBlock.hidden = true;
@@ -169,6 +199,7 @@ export class GameReviewPanel {
     this.review = review;
     this.game = game;
     this.currentPly = -1;
+    this.el.presetSelect.disabled = false;
     this.el.progressBlock.hidden = true;
     this.el.analyzeButton.hidden = true;
     this.el.resultsBlock.hidden = false;
@@ -178,10 +209,17 @@ export class GameReviewPanel {
     this.refreshView();
   }
 
-  showAnalyzeReady(): void {
+  showAnalyzeReady(options?: { hideResults?: boolean }): void {
+    this.el.presetSelect.disabled = false;
     this.el.progressBlock.hidden = true;
     this.el.analyzeButton.hidden = false;
     this.el.analyzeButton.disabled = false;
+    if (options?.hideResults) {
+      this.review = null;
+      this.el.resultsBlock.hidden = true;
+      this.el.moveList.replaceChildren();
+      this.el.boardHost.replaceChildren();
+    }
   }
 
   private renderSummary(): void {
