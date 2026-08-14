@@ -9,7 +9,7 @@
     "packages/extension"
   ],
   "scripts": {
-    "test": "npm run test -w @game-review/core",
+    "test": "npm run test -w @game-review/core && npm run test -w @game-review/extension",
     "typecheck": "npm run typecheck -w @game-review/core && npm run typecheck -w @game-review/extension",
     "build:extension": "npm run build -w @game-review/extension",
     "poc:lichess": "npm run poc:lichess -w @game-review/extension",

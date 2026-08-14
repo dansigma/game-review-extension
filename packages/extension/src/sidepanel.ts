@@ -4,12 +4,14 @@ import {
   summarizeExport,
   type LichessExportJson,
 } from "./lichessExport.ts";
+import { loadLichessGame } from "./lichessProvider.ts";
 import type { ActiveGameData } from "./messages.ts";
 import {
   createEnginePort,
   KIWIPETE_FEN,
   type EnginePort,
 } from "./enginePort.ts";
+import type { NormalizedGame } from "@game-review/core";
 import { parsePgn } from "@game-review/core";
 import { MVP_GO_COMMAND } from "./budgetDecision.ts";
 
@@ -18,6 +20,15 @@ const statusEl = document.querySelector("#status");
 const activeGameIdEl = document.querySelector("#active-game-id");
 const gameIdHintEl = document.querySelector("#game-id-hint");
 const gameIdInput = document.querySelector("#game-id");
+const loadGameButton = document.querySelector("#load-game");
+const gameSummaryEl = document.querySelector("#game-summary");
+const gamePlayersEl = document.querySelector("#game-players");
+const gameResultEl = document.querySelector("#game-result");
+const gameMovesCountEl = document.querySelector("#game-moves-count");
+const loadErrorEl = document.querySelector("#load-error");
+
+let activeGameId: string | null = null;
+let autoLoadAttemptedFor: string | null = null;
 
 function log(message: string): void {
   if (!(logEl instanceof HTMLElement)) {
@@ -29,6 +40,7 @@ function log(message: string): void {
 }
 
 function setActiveGameId(gameId: string | null): void {
+  activeGameId = gameId;
   if (activeGameIdEl instanceof HTMLElement) {
     activeGameIdEl.textContent = gameId ?? "—";
   }
@@ -40,6 +52,92 @@ function setActiveGameId(gameId: string | null): void {
   if (gameIdInput instanceof HTMLInputElement && gameId) {
     gameIdInput.value = gameId;
   }
+  if (loadGameButton instanceof HTMLButtonElement) {
+    loadGameButton.disabled = !gameId;
+  }
+  if (!gameId) {
+    clearGameSummary();
+  }
+}
+
+function clearGameSummary(): void {
+  if (gameSummaryEl instanceof HTMLElement) {
+    gameSummaryEl.hidden = true;
+  }
+  if (loadErrorEl instanceof HTMLElement) {
+    loadErrorEl.hidden = true;
+    loadErrorEl.textContent = "";
+    loadErrorEl.classList.remove("error");
+  }
+}
+
+function showLoadError(message: string): void {
+  if (gameSummaryEl instanceof HTMLElement) {
+    gameSummaryEl.hidden = true;
+  }
+  if (loadErrorEl instanceof HTMLElement) {
+    loadErrorEl.hidden = false;
+    loadErrorEl.textContent = message;
+    loadErrorEl.classList.add("error");
+  }
+}
+
+function showGameSummary(game: NormalizedGame): void {
+  if (loadErrorEl instanceof HTMLElement) {
+    loadErrorEl.hidden = true;
+    loadErrorEl.textContent = "";
+    loadErrorEl.classList.remove("error");
+  }
+  if (gameSummaryEl instanceof HTMLElement) {
+    gameSummaryEl.hidden = false;
+  }
+  if (gamePlayersEl instanceof HTMLElement) {
+    const whiteRating = game.players.white.rating ? ` (${game.players.white.rating})` : "";
+    const blackRating = game.players.black.rating ? ` (${game.players.black.rating})` : "";
+    gamePlayersEl.textContent = `${game.players.white.name}${whiteRating} vs ${game.players.black.name}${blackRating}`;
+  }
+  if (gameResultEl instanceof HTMLElement) {
+    gameResultEl.textContent = `Resultado: ${game.result}`;
+  }
+  if (gameMovesCountEl instanceof HTMLElement) {
+    gameMovesCountEl.textContent = `Jogadas: ${game.moves.length}`;
+  }
+}
+
+async function fetchLichessExport(gameId: string): Promise<LichessExportJson> {
+  return (await sendBackground({
+    type: "lichess-export",
+    gameId,
+  })) as LichessExportJson;
+}
+
+async function loadActiveGame(): Promise<void> {
+  if (!activeGameId) {
+    return;
+  }
+  setStatus(`Carregando ${activeGameId}…`);
+  clearGameSummary();
+  try {
+    const game = await loadLichessGame(activeGameId, fetchLichessExport);
+    showGameSummary(game);
+    setStatus(`Partida ${game.gameId} carregada`);
+    log(
+      `loaded ${game.gameId}: ${game.players.white.name} vs ${game.players.black.name}, ${game.result}, ${game.moves.length} plies`,
+    );
+  } catch (error: unknown) {
+    const text = error instanceof Error ? error.message : String(error);
+    showLoadError(text);
+    setStatus("Falha ao carregar partida");
+    log(`load failed: ${text}`);
+  }
+}
+
+function maybeAutoLoadGame(gameId: string): void {
+  if (autoLoadAttemptedFor === gameId) {
+    return;
+  }
+  autoLoadAttemptedFor = gameId;
+  void loadActiveGame();
 }
 
 async function loadActiveGameFromSession(): Promise<void> {
@@ -51,6 +149,7 @@ async function loadActiveGameFromSession(): Promise<void> {
   if (data?.gameId) {
     setActiveGameId(data.gameId);
     setStatus(`Partida ${data.gameId}`);
+    maybeAutoLoadGame(data.gameId);
   }
 }
 
@@ -62,6 +161,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (typeof next === "string" && next.length > 0) {
     setActiveGameId(next);
     setStatus(`Partida ${next}`);
+    maybeAutoLoadGame(next);
   }
 });
 
@@ -210,6 +310,10 @@ async function runBudget(args: {
     setStatus(`PoC 3 ${args.label} done.`);
   });
 }
+
+loadGameButton?.addEventListener("click", () => {
+  void loadActiveGame();
+});
 
 document.querySelector("#poc1")?.addEventListener("click", () => {
   void runPoc1().catch((error: unknown) => {

@@ -88,6 +88,9 @@
       .status strong {
         color: var(--accent);
       }
+      .status.error {
+        color: var(--warn);
+      }
       details {
         background: var(--card);
         border-radius: 8px;
@@ -117,6 +120,15 @@
         <h2>Partida</h2>
         <p id="game-id-hint">Abra uma partida no Lichess e use o botão na página.</p>
         <div class="game-id-value" id="active-game-id">—</div>
+        <div class="row">
+          <button id="load-game" type="button" disabled>Carregar partida</button>
+        </div>
+        <div id="game-summary" hidden>
+          <p id="game-players"></p>
+          <p id="game-result"></p>
+          <p id="game-moves-count"></p>
+        </div>
+        <p id="load-error" class="status" hidden></p>
       </section>
 
       <details>

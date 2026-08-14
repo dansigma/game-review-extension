@@ -10,7 +10,15 @@ export interface LichessExportJson {
   speed?: string;
   status: LichessGameStatus;
   winner?: string;
+  /** Space-separated SAN (Lichess JSON). Not UCI. */
   moves?: string;
+  /** Present when the export is requested with `pgnInJson=true`. */
+  pgn?: string;
+  createdAt?: number;
+  clock?: {
+    initial?: number;
+    increment?: number;
+  };
   players?: {
     white?: { user?: { name?: string }; rating?: number };
     black?: { user?: { name?: string }; rating?: number };
@@ -30,11 +38,22 @@ export function extractGameId(input: string): string | undefined {
   return match?.[1];
 }
 
+export function lichessExportUrl(
+  gameId: string,
+  options: { pgnInJson?: boolean } = {},
+): string {
+  const url = new URL(`${LICHESS_EXPORT_URL}/${gameId}`);
+  if (options.pgnInJson) {
+    url.searchParams.set("pgnInJson", "true");
+  }
+  return url.toString();
+}
+
 export async function exportLichessGame(gameId: string): Promise<LichessExportJson> {
   if (!LICHESS_GAME_ID_RE.test(gameId)) {
     throw new Error("Lichess game id must be 8 characters");
   }
-  const response = await fetch(`${LICHESS_EXPORT_URL}/${gameId}`, {
+  const response = await fetch(lichessExportUrl(gameId, { pgnInJson: true }), {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) {

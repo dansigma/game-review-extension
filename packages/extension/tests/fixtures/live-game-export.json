@@ -1,0 +1,11 @@
+{
+  "id": "live1234",
+  "variant": "standard",
+  "speed": "blitz",
+  "status": "started",
+  "moves": "e2e4 e7e5",
+  "players": {
+    "white": { "user": { "name": "White" } },
+    "black": { "user": { "name": "Black" } }
+  }
+}

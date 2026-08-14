@@ -3,7 +3,7 @@ import type {
   BackgroundRequest,
   BackgroundResponse,
 } from "./messages.ts";
-import { isLiveStatus } from "./lichessExport.ts";
+import { isLiveStatus, lichessExportUrl } from "./lichessExport.ts";
 
 const SESSION_KEY = "activeGameId";
 
@@ -35,7 +35,7 @@ async function handle(
 ): Promise<unknown> {
   if (message.type === "lichess-export") {
     const response = await fetch(
-      `https://lichess.org/game/export/${message.gameId}`,
+      lichessExportUrl(message.gameId, { pgnInJson: true }),
       { headers: { Accept: "application/json" } },
     );
     if (!response.ok) {
