@@ -94,23 +94,37 @@ function playerName(
   return name && name.length > 0 ? name : fallback;
 }
 
-function uciMovesToMovetext(moves: string, result: GameResult): string {
+const UCI_TOKEN_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/i;
+
+function playExportToken(chess: Chess, token: string): { san: string } {
+  if (UCI_TOKEN_RE.test(token)) {
+    const from = token.slice(0, 2);
+    const to = token.slice(2, 4);
+    const promotion = token.length > 4 ? token[4] : undefined;
+    const uciMove = chess.move({ from, to, promotion });
+    if (uciMove) {
+      return uciMove;
+    }
+  }
+  const sanMove = chess.move(token);
+  if (!sanMove) {
+    throw new LichessProviderError(`Jogada inválida no export: ${token}`);
+  }
+  return sanMove;
+}
+
+/** Lichess JSON `moves` is SAN (`g.sans`). Accept UCI tokens as a fallback. */
+function exportMovesToMovetext(moves: string, result: GameResult): string {
   const chess = new Chess();
   const tokens = moves.trim().split(/\s+/).filter(Boolean);
   const parts: string[] = [];
 
   for (let i = 0; i < tokens.length; i += 1) {
-    const uci = tokens[i];
-    if (!uci) {
+    const token = tokens[i];
+    if (!token) {
       continue;
     }
-    const from = uci.slice(0, 2);
-    const to = uci.slice(2, 4);
-    const promotion = uci.length > 4 ? uci[4] : undefined;
-    const move = chess.move({ from, to, promotion });
-    if (!move) {
-      throw new LichessProviderError(`Jogada UCI inválida: ${uci}`);
-    }
+    const move = playExportToken(chess, token);
     if (i % 2 === 0) {
       parts.push(`${Math.floor(i / 2) + 1}.`, move.san);
     } else {
@@ -161,13 +175,18 @@ export function buildPgnFromLichessExport(json: LichessExportJson): string {
   }
 
   const movetext = json.moves?.trim()
-    ? uciMovesToMovetext(json.moves, result)
+    ? exportMovesToMovetext(json.moves, result)
     : result;
 
   return `${headers.join("\n")}\n\n${movetext}`;
 }
 
 export function lichessExportToNormalizedGame(json: LichessExportJson): NormalizedGame {
+  assertReviewableLichessExport(json);
+  if (json.pgn && json.pgn.trim().length > 0) {
+    const game = parsePgn(json.pgn);
+    return { ...game, gameId: json.id };
+  }
   return parsePgn(buildPgnFromLichessExport(json));
 }
 

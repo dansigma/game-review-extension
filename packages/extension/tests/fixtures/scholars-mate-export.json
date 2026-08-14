@@ -4,7 +4,7 @@
   "speed": "blitz",
   "status": "mate",
   "winner": "white",
-  "moves": "e2e4 e7e5 d1h5 b8c6 f1c4 g8f6 h5f7",
+  "moves": "e4 e5 Qh5 Nc6 Bc4 Nf6 Qxf7#",
   "clock": { "initial": 300, "increment": 0 },
   "createdAt": 1735689600000,
   "players": {

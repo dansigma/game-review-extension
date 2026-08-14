@@ -58,6 +58,49 @@ describe("lichessProvider", () => {
     expect(pgn).toContain("1-0");
   });
 
+  it("maps SAN movetext from the real Lichess JSON shape", () => {
+    const json = fixture("scholars-mate-export.json");
+    expect(json.moves).toBe("e4 e5 Qh5 Nc6 Bc4 Nf6 Qxf7#");
+    const game = lichessExportToNormalizedGame(json);
+    expect(game.moves.map((move) => move.san)).toEqual([
+      "e4",
+      "e5",
+      "Qh5",
+      "Nc6",
+      "Bc4",
+      "Nf6",
+      "Qxf7#",
+    ]);
+  });
+
+  it("still accepts UCI tokens if a fixture uses them", () => {
+    const json = fixture("scholars-mate-export.json");
+    const uciJson: LichessExportJson = {
+      ...json,
+      moves: "e2e4 e7e5 d1h5 b8c6 f1c4 g8f6 h5f7",
+    };
+    const game = lichessExportToNormalizedGame(uciJson);
+    expect(game.moves[6]?.uci).toBe("h5f7");
+  });
+
+  it("prefers the pgn field when pgnInJson is present", () => {
+    const json = fixture("scholars-mate-export.json");
+    const withPgn: LichessExportJson = {
+      ...json,
+      moves: "this is not chess",
+      pgn: `[GameId "fixture1"]
+[White "Alice"]
+[Black "Bob"]
+[Result "1-0"]
+[Variant "Standard"]
+
+1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0`,
+    };
+    const game = lichessExportToNormalizedGame(withPgn);
+    expect(game.gameId).toBe("fixture1");
+    expect(game.moves).toHaveLength(7);
+  });
+
   it("rejects live games (status started)", () => {
     const json = fixture("live-game-export.json");
     expect(() => lichessExportToNormalizedGame(json)).toThrow(LichessProviderError);
