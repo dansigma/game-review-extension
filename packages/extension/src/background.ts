@@ -4,6 +4,7 @@ import type {
   BackgroundResponse,
 } from "./messages.ts";
 import { isLiveStatus, lichessExportUrl } from "./lichessExport.ts";
+import { formatLichessExportHttpError } from "./reviewErrors.ts";
 
 const SESSION_KEY = "activeGameId";
 
@@ -34,12 +35,17 @@ async function handle(
   sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
   if (message.type === "lichess-export") {
-    const response = await fetch(
-      lichessExportUrl(message.gameId, { pgnInJson: true }),
-      { headers: { Accept: "application/json" } },
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        lichessExportUrl(message.gameId, { pgnInJson: true }),
+        { headers: { Accept: "application/json" } },
+      );
+    } catch {
+      throw new Error("Falha de rede");
+    }
     if (!response.ok) {
-      throw new Error(`Lichess export HTTP ${response.status}`);
+      throw new Error(formatLichessExportHttpError(response.status));
     }
     return response.json();
   }
@@ -68,12 +74,17 @@ async function openReviewPanel(
   gameId: string,
   tabId: number | undefined,
 ): Promise<{ gameId: string; opened: boolean }> {
-  const exportResponse = await fetch(
-    `https://lichess.org/game/export/${gameId}`,
-    { headers: { Accept: "application/json" } },
-  );
+  let exportResponse: Response;
+  try {
+    exportResponse = await fetch(
+      `https://lichess.org/game/export/${gameId}`,
+      { headers: { Accept: "application/json" } },
+    );
+  } catch {
+    throw new Error("Falha de rede");
+  }
   if (!exportResponse.ok) {
-    throw new Error(`Lichess export HTTP ${exportResponse.status}`);
+    throw new Error(formatLichessExportHttpError(exportResponse.status));
   }
   const game = (await exportResponse.json()) as { status?: string };
   if (isLiveStatus(game.status ?? "")) {

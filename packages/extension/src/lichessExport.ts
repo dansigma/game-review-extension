@@ -1,3 +1,5 @@
+import { formatLichessExportHttpError } from "./reviewErrors.ts";
+
 export const LICHESS_EXPORT_URL = "https://lichess.org/game/export";
 
 export const LICHESS_GAME_ID_RE = /^[a-zA-Z0-9]{8}$/;
@@ -53,11 +55,16 @@ export async function exportLichessGame(gameId: string): Promise<LichessExportJs
   if (!LICHESS_GAME_ID_RE.test(gameId)) {
     throw new Error("Lichess game id must be 8 characters");
   }
-  const response = await fetch(lichessExportUrl(gameId, { pgnInJson: true }), {
-    headers: { Accept: "application/json" },
-  });
+  let response: Response;
+  try {
+    response = await fetch(lichessExportUrl(gameId, { pgnInJson: true }), {
+      headers: { Accept: "application/json" },
+    });
+  } catch {
+    throw new Error("Falha de rede");
+  }
   if (!response.ok) {
-    throw new Error(`Lichess export failed: ${response.status}`);
+    throw new Error(formatLichessExportHttpError(response.status));
   }
   return (await response.json()) as LichessExportJson;
 }

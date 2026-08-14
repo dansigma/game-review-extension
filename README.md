@@ -7,9 +7,9 @@ Arquitetura travada em [SIG-651](https://linear.app/sigmalabs/issue/SIG-651). Es
 ## Pacotes
 
 - `packages/core` — `NormalizedGame` + `ReviewEngine` (TypeScript puro, sem Chrome/DOM). SIG-653.
-- `packages/extension` — shell MV3 + PoCs do Side Panel. SIG-652.
+- `packages/extension` — shell MV3 + Side Panel. SIG-652.
 
-Pipeline: `HostAdapter` → `Provider` → `NormalizedGame` → `EnginePort` → `ReviewEngine` → `GameReview`.
+Pipeline: `HostAdapter` → `Provider` → `NormalizedGame` → `EnginePort` → `ReviewEngine` → `GameReview` → IndexedDB + Side Panel.
 
 ## Desenvolvimento
 
@@ -20,9 +20,27 @@ npm run poc:lichess
 npm run build:extension
 ```
 
-No Chrome: `chrome://extensions` → Developer mode → Load unpacked → `packages/extension/dist`. O ícone da extensão abre o Side Panel dos PoCs.
+### Carregar no Chrome (uso interno Lichess)
 
-`npm run poc:budget` tenta o mesmo orçamento depth vs nodes em Node (WASM).
+1. `npm run build:extension`
+2. `chrome://extensions` → Modo do desenvolvedor → **Carregar sem compactação**
+3. Selecione a pasta `packages/extension/dist`
+4. Abra uma partida **finalizada** no Lichess e use o botão na página ou o ícone da extensão para abrir o Side Panel
+
+**Cancelar análise:** feche o Side Panel ou use **Cancelar** durante a análise. A análise interrompida não é salva no cache.
+
+**Partidas ao vivo:** partidas com `status === started` são rejeitadas — análise só pós-jogo.
+
+## Cache IndexedDB (MVP)
+
+Reabrir a mesma partida finalizada não reexecuta o Stockfish se o cache acertar. A chave inclui:
+
+- `gameId`
+- `algoVersion` (`epl-v1`)
+- `engineId` (`sf_18_smallnet`)
+- `nodesPerPosition` (`80000`)
+
+Formato: `gameId|algoVersion|engineId|nodesPerPosition`. Mudar `ALGO_VERSION` invalida entradas antigas.
 
 ## Orçamento do motor (SIG-652)
 
@@ -37,6 +55,11 @@ Win% usa a curva logística do Lichess (`0.00368208`). Precisão **não** usa `1
 - Partida: `0.5 * trimmedMean + 0.5 * harmonicMean`
 - Classes: Best / Good / Imprecisão / Erro / Blunder
 - Hopeless (win% ≤ 10) → Forced, fora da precisão
+
+## Licenças
+
+- Extensão e `packages/core`: **GPL-3.0-only**
+- Motor embutido: Stockfish (GPL) via `@lichess-org/stockfish-web` (AGPL-3.0-or-later)
 
 ## Fora do MVP
 
