@@ -2,10 +2,14 @@
   "manifest_version": 3,
   "name": "Game Review",
   "version": "0.1.0",
-  "description": "Análise pós-partida no Lichess. Stockfish local. GPL-3.0.",
+  "description": "Análise pós-partida no Lichess e Chess.com. Stockfish local. GPL-3.0.",
   "minimum_chrome_version": "116",
   "permissions": ["sidePanel", "tabs", "storage"],
-  "host_permissions": ["https://lichess.org/*"],
+  "host_permissions": [
+    "https://lichess.org/*",
+    "https://www.chess.com/*",
+    "https://api.chess.com/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -20,6 +24,14 @@
     {
       "matches": ["https://lichess.org/*"],
       "js": ["content/lichessGameCta.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.chess.com/game/*",
+        "https://www.chess.com/analysis/game/*"
+      ],
+      "js": ["content/chesscomGameCta.js"],
       "run_at": "document_idle"
     }
   ],

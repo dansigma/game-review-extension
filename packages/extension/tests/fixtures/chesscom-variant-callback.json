@@ -1,0 +1,15 @@
+{
+  "game": {
+    "isFinished": true,
+    "type": "chess960",
+    "typeName": "Chess960",
+    "pgnHeaders": {
+      "White": "AliceChess",
+      "Black": "BobChess",
+      "Date": "2024.03.15",
+      "Result": "1-0",
+      "Variant": "Chess960",
+      "SetUp": "1"
+    }
+  }
+}

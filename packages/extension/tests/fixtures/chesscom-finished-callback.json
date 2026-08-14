@@ -1,0 +1,17 @@
+{
+  "game": {
+    "isFinished": true,
+    "type": "chess",
+    "typeName": "Live Chess",
+    "pgnHeaders": {
+      "White": "AliceChess",
+      "Black": "BobChess",
+      "Date": "2024.03.15",
+      "Result": "1-0",
+      "WhiteElo": "1500",
+      "BlackElo": "1400",
+      "TimeControl": "300"
+    },
+    "moveList": "ignored-proprietary-blob"
+  }
+}
