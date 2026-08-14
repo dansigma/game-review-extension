@@ -11,6 +11,7 @@ export interface AnalyzePositionArgs {
   fen: string;
   go: string;
   multipv?: number;
+  signal?: AbortSignal;
 }
 
 export interface PositionAnalysis {
@@ -84,25 +85,29 @@ export class StockfishSession {
     let bestMove = "";
     let nodes: number | undefined;
     let nps: number | undefined;
-    await this.sendAndCollect(`go ${args.go}`, (line) => {
-      const info = parseInfoLine(line);
-      if (info) {
-        if (info.nodes !== undefined) {
-          nodes = info.nodes;
+    await this.sendAndCollect(
+      `go ${args.go}`,
+      (line) => {
+        const info = parseInfoLine(line);
+        if (info) {
+          if (info.nodes !== undefined) {
+            nodes = info.nodes;
+          }
+          if (info.nps !== undefined) {
+            nps = info.nps;
+          }
+          if (info.score && info.pv && info.pv.length > 0) {
+            infos.push(info);
+          }
         }
-        if (info.nps !== undefined) {
-          nps = info.nps;
+        if (isBestMove(line)) {
+          bestMove = line.split(/\s+/)[1] ?? "";
+          return true;
         }
-        if (info.score && info.pv && info.pv.length > 0) {
-          infos.push(info);
-        }
-      }
-      if (isBestMove(line)) {
-        bestMove = line.split(/\s+/)[1] ?? "";
-        return true;
-      }
-      return false;
-    });
+        return false;
+      },
+      args.signal,
+    );
     const latestByPv = new Map<number, UciInfo>();
     for (const info of infos) {
       latestByPv.set(info.multipv ?? 1, info);
@@ -129,14 +134,39 @@ export class StockfishSession {
   private sendAndCollect(
     command: string,
     done: (line: string) => boolean,
+    signal?: AbortSignal,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(abortError(signal));
+        return;
+      }
+
+      let aborted = false;
       const timeout = setTimeout(() => {
         cleanup();
         reject(new Error(`Timeout waiting for engine after: ${command}`));
       }, 120_000);
+
+      const onAbort = () => {
+        aborted = true;
+        if (command.startsWith("go ")) {
+          this.sendUci("stop");
+          return;
+        }
+        cleanup();
+        reject(abortError(signal));
+      };
+
       const onLine = (line: string) => {
         try {
+          if (aborted) {
+            if (isBestMove(line)) {
+              cleanup();
+              reject(abortError(signal));
+            }
+            return;
+          }
           if (done(line)) {
             cleanup();
             resolve();
@@ -146,17 +176,28 @@ export class StockfishSession {
           reject(error);
         }
       };
+
       const cleanup = () => {
         clearTimeout(timeout);
+        signal?.removeEventListener("abort", onAbort);
         const index = this.waiters.indexOf(onLine);
         if (index >= 0) {
           this.waiters.splice(index, 1);
         }
       };
+
+      signal?.addEventListener("abort", onAbort);
       this.waiters.push(onLine);
       this.sendUci(command);
     });
   }
+}
+
+function abortError(signal?: AbortSignal): Error {
+  if (signal?.reason instanceof Error) {
+    return signal.reason;
+  }
+  return new DOMException("Aborted", "AbortError");
 }
 
 export const KIWIPETE_FEN =
