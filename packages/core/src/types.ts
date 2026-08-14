@@ -105,6 +105,8 @@ export interface ReviewedMove {
   bestUci: string;
   playedIsBest: boolean;
   alternativeUci?: string;
+  /** Side-to-move win% for MultiPV line 2 before the played move; absent when PV2 missing. */
+  alternativePlayerWinPercent?: number;
 }
 
 export interface EvalGraphPoint {

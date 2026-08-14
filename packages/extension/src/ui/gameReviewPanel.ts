@@ -1,4 +1,5 @@
 import {
+  isOnlyMove,
   MOVE_CLASS_LABEL_PT,
   selectCriticalMoments,
   type CriticalMoment,
@@ -280,8 +281,12 @@ export class GameReviewPanel {
     btn.className = `move-btn ${CLASS_CSS[move.classification]}`;
     btn.dataset.ply = String(ply);
     btn.title = MOVE_CLASS_LABEL_PT[move.classification];
+    const onlyMoveBadge = isOnlyMove(move)
+      ? `<span class="move-only-badge" title="Lance único">Único</span>`
+      : "";
     btn.innerHTML =
       `<span class="move-san">${escapeHtml(move.san)}</span>` +
+      onlyMoveBadge +
       `<span class="move-class">${escapeHtml(move.classificationLabel)}</span>`;
     if (ply === this.currentPly) {
       btn.classList.add("move-active");
@@ -329,10 +334,14 @@ export class GameReviewPanel {
     const max = (this.game?.moves.length ?? 0) - 1;
     this.el.navPrev.disabled = this.currentPly <= -1;
     this.el.navNext.disabled = this.currentPly >= max;
+    const reviewed =
+      this.currentPly >= 0 ? this.review?.moves[this.currentPly] : undefined;
+    const onlyMoveHint =
+      reviewed && isOnlyMove(reviewed) ? " · Lance único" : "";
     const label =
       this.currentPly < 0
         ? "Posição inicial"
-        : `Lance ${this.currentPly + 1} / ${max + 1}`;
+        : `Lance ${this.currentPly + 1} / ${max + 1}${onlyMoveHint}`;
     this.el.plyLabel.textContent = label;
   }
 

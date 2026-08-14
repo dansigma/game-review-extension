@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ALGO_VERSION, type EngineLine, type PositionEval } from "../src/types.ts";
 import { parsePgn } from "../src/parsePgn.ts";
+import { isOnlyMove } from "../src/onlyMove.ts";
 import { reviewGame } from "../src/reviewEngine.ts";
 import { playerWinPercent } from "../src/winPercent.ts";
 
@@ -97,6 +98,7 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.graph).toHaveLength(game.moves.length + 1);
     expect(review.white.movesCounted).toBeGreaterThan(0);
     expect(review.black.movesCounted).toBeGreaterThan(0);
+    expect(review.moves.every((move) => !isOnlyMove(move))).toBe(true);
   });
 
   it("marks hopeless plies Forced and excludes them from accuracy", () => {
@@ -189,5 +191,77 @@ describe("reviewGame on PGN fixtures", () => {
         engineId: "sf_18_smallnet",
       }),
     ).toThrow(/Expected 3 position evals/);
+  });
+
+  it("persists alternativePlayerWinPercent and flags only-move when PV2 is clearly worse", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    expect(firstMove).toBeDefined();
+
+    const pv1Win = 62;
+    const pv2Win = 48;
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(pv1Win) }, "e2e4"),
+          line(2, { type: "cp", value: cpFromWinPercent(pv2Win) }, "d2d4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(50) }, "e7e5"),
+          line(2, { type: "cp", value: cpFromWinPercent(49) }, "c7c5"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 1) },
+      evals,
+      engineId: "sf_18_smallnet",
+    });
+
+    expect(review.moves[0]?.alternativePlayerWinPercent).toBeCloseTo(pv2Win, 5);
+    expect(review.moves[0]?.playerWinPercentBefore).toBeCloseTo(pv1Win, 5);
+    expect(isOnlyMove(review.moves[0]!)).toBe(true);
+  });
+
+  it("does not flag only-move when PV1 and PV2 win% are close", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    expect(firstMove).toBeDefined();
+
+    const pv1Win = 55;
+    const pv2Win = 54;
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(pv1Win) }, "e2e4"),
+          line(2, { type: "cp", value: cpFromWinPercent(pv2Win) }, "d2d4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(50) }, "e7e5"),
+          line(2, { type: "cp", value: cpFromWinPercent(49) }, "c7c5"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 1) },
+      evals,
+      engineId: "sf_18_smallnet",
+    });
+
+    expect(isOnlyMove(review.moves[0]!)).toBe(false);
   });
 });
