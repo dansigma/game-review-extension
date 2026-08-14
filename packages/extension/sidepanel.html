@@ -225,6 +225,75 @@
         font-size: 12px;
         color: var(--muted);
       }
+      .critical-moments {
+        display: grid;
+        gap: 6px;
+      }
+      .critical-moments h3 {
+        font-size: 13px;
+        margin: 0;
+        color: var(--text);
+      }
+      #critical-moments-list {
+        display: grid;
+        gap: 4px;
+      }
+      .critical-moments-empty {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+      }
+      .critical-moment-btn {
+        width: 100%;
+        display: grid;
+        gap: 2px;
+        padding: 6px 8px;
+        text-align: left;
+        border: 1px solid #333;
+        background: #1a1917;
+      }
+      .critical-moment-btn:hover {
+        background: #22211f;
+      }
+      .critical-moment-btn.critical-moment-active {
+        outline: 2px solid var(--accent);
+        outline-offset: -1px;
+      }
+      .critical-moment-main,
+      .critical-moment-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .critical-moment-move {
+        font-weight: 600;
+        font-family: ui-monospace, monospace;
+      }
+      .critical-moment-color,
+      .critical-moment-stats {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .critical-moment-class {
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .critical-moment-btn.move-inaccuracy .critical-moment-class {
+        color: var(--move-inaccuracy);
+      }
+      .critical-moment-btn.move-mistake .critical-moment-class {
+        color: var(--move-mistake);
+      }
+      .critical-moment-btn.move-blunder .critical-moment-class {
+        color: var(--move-blunder);
+      }
+      .critical-moment-btn.move-good .critical-moment-class {
+        color: var(--move-good);
+      }
+      .critical-moment-btn.move-best .critical-moment-class {
+        color: var(--move-best);
+      }
     </style>
   </head>
   <body>
@@ -280,6 +349,10 @@
             <span id="ply-label">Posição inicial</span>
             <button id="nav-next" type="button" title="Próximo">▶</button>
             <button id="nav-end" type="button" title="Fim">▶|</button>
+          </div>
+          <div id="critical-moments" class="critical-moments">
+            <h3>Momentos críticos</h3>
+            <div id="critical-moments-list"></div>
           </div>
           <div class="move-list-wrap">
             <table id="move-list" aria-label="Lista de lances"></table>
