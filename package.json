@@ -1,0 +1,21 @@
+{
+  "name": "game-review-extension",
+  "private": true,
+  "version": "0.1.0",
+  "license": "GPL-3.0-only",
+  "description": "Chrome MV3 post-game review. Stockfish 18 local. GPL-3.0.",
+  "workspaces": [
+    "packages/core",
+    "packages/extension"
+  ],
+  "scripts": {
+    "test": "npm run test -w @game-review/core",
+    "typecheck": "npm run typecheck -w @game-review/core && npm run typecheck -w @game-review/extension",
+    "build:extension": "npm run build -w @game-review/extension",
+    "poc:lichess": "npm run poc:lichess -w @game-review/extension",
+    "poc:budget": "npm run poc:budget -w @game-review/extension"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Game Review PoCs",
+  "version": "0.1.0",
+  "description": "SIG-652: Stockfish 18 WASM, Lichess export, analysis budget. Post-game only.",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel"],
+  "host_permissions": ["https://lichess.org/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Game Review PoCs"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self'"
+  },
+  "cross_origin_embedder_policy": {
+    "value": "require-corp"
+  },
+  "cross_origin_opener_policy": {
+    "value": "same-origin"
+  }
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Game Review PoCs</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #161513;
+        --card: #262421;
+        --text: #f0ece4;
+        --muted: #9e9a91;
+        --accent: #629924;
+        --warn: #c44;
+      }
+      body {
+        margin: 0;
+        font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main {
+        padding: 12px;
+        display: grid;
+        gap: 12px;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 4px;
+      }
+      p,
+      .status {
+        color: var(--muted);
+        margin: 0;
+      }
+      section {
+        background: var(--card);
+        border-radius: 8px;
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+      }
+      button,
+      input {
+        font: inherit;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid #444;
+        background: #111;
+        color: var(--text);
+      }
+      button {
+        cursor: pointer;
+        background: #333;
+      }
+      button:hover {
+        background: #3d3d3d;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      pre {
+        margin: 0;
+        max-height: 280px;
+        overflow: auto;
+        background: #111;
+        padding: 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: pre-wrap;
+      }
+      .status strong {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>SIG-652 PoCs</h1>
+        <p>Pós-partida. Stockfish 18 no Side Panel. Sem scrape de DOM.</p>
+        <p class="status">Estado: <strong id="status">Idle</strong></p>
+      </header>
+
+      <section>
+        <h1>PoC 1 — sf_18_smallnet</h1>
+        <p>UCI, MultiPV=2, Threads=1, posição Kiwipete, <code>go nodes 20000</code>.</p>
+        <div class="row">
+          <button id="poc1" type="button">Rodar PoC 1</button>
+        </div>
+      </section>
+
+      <section>
+        <h1>PoC 2 — GET /game/export/{id}</h1>
+        <p>Accept: application/json. Rejeita <code>status === started</code>.</p>
+        <div class="row">
+          <input id="game-id" value="8fuPHGyu" size="16" />
+          <button id="poc2" type="button">Exportar id</button>
+          <button id="poc2-samples" type="button">Finished + TV</button>
+        </div>
+      </section>
+
+      <section>
+        <h1>PoC 3 — orçamento</h1>
+        <p>Compara <code>go nodes 80000</code> vs <code>go depth 16</code>. Meta: 80 plies ≤ ~2 min.</p>
+        <div class="row">
+          <button id="poc3-nodes" type="button">40 plies × nodes 80k</button>
+          <button id="poc3-80" type="button">Opera × nodes 80k</button>
+          <button id="poc3-depth" type="button">16 plies × depth 16</button>
+        </div>
+      </section>
+
+      <pre id="log"></pre>
+    </main>
+    <script type="module" src="/src/sidepanel.ts"></script>
+  </body>
+</html>

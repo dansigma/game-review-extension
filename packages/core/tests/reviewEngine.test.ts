@@ -1,0 +1,193 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { ALGO_VERSION, type EngineLine, type PositionEval } from "../src/types.ts";
+import { parsePgn } from "../src/parsePgn.ts";
+import { reviewGame } from "../src/reviewEngine.ts";
+import { playerWinPercent } from "../src/winPercent.ts";
+
+function fixture(name: string): string {
+  return readFileSync(
+    fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url)),
+    "utf8",
+  );
+}
+
+const SLOPE = 0.00368208;
+
+function cpFromWinPercent(winPercent: number): number {
+  const p = Math.min(99.5, Math.max(0.5, winPercent)) / 100;
+  return -Math.log(1 / p - 1) / SLOPE;
+}
+
+function line(
+  multipv: number,
+  score: EngineLine["score"],
+  pv: string,
+): EngineLine {
+  return { multipv, depth: 16, score, pv: [pv] };
+}
+
+describe("reviewGame on PGN fixtures", () => {
+  it("covers Best / Good / Imprecisão / Erro / Blunder from classification-coverage.pgn", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    expect(game.moves.map((move) => move.uci)).toEqual([
+      "e2e4",
+      "e7e5",
+      "g1f3",
+      "b8c6",
+      "f1b5",
+      "a7a6",
+    ]);
+
+    const stmWin = [55, 45, 58, 50, 65, 60, 40];
+    const pvs = [
+      "e2e4",
+      "c7c5",
+      "d2d4",
+      "g8f6",
+      "d2d4",
+      "a7a6",
+      "d2d4",
+    ];
+    const alt = "a2a3";
+
+    const evals: PositionEval[] = stmWin.map((wp, ply) => {
+      const fen =
+        ply === 0 ? game.initialFen : (game.moves[ply - 1]?.fenAfter ?? "");
+      const pv = pvs[ply] ?? alt;
+      return {
+        fen,
+        ply,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(wp) }, pv),
+          line(2, { type: "cp", value: cpFromWinPercent(wp) - 15 }, alt),
+        ],
+      };
+    });
+
+    const review = reviewGame({
+      game,
+      evals,
+      engineId: "sf_18_smallnet",
+      nodesPerPosition: 80_000,
+    });
+
+    expect(review.algoVersion).toBe(ALGO_VERSION);
+    expect(review.algoVersion).toBe("epl-v1");
+    expect(review.moves.map((move) => move.classification)).toEqual([
+      "best",
+      "good",
+      "inaccuracy",
+      "mistake",
+      "blunder",
+      "best",
+    ]);
+    expect(review.moves.map((move) => move.classificationLabel)).toEqual([
+      "Best",
+      "Good",
+      "Imprecisão",
+      "Erro",
+      "Blunder",
+      "Best",
+    ]);
+    expect(review.moves[0]?.playedIsBest).toBe(true);
+    expect(review.moves[1]?.playedIsBest).toBe(false);
+    expect(review.moves[4]?.epl).toBeGreaterThanOrEqual(0.2);
+    expect(review.graph).toHaveLength(game.moves.length + 1);
+    expect(review.white.movesCounted).toBeGreaterThan(0);
+    expect(review.black.movesCounted).toBeGreaterThan(0);
+  });
+
+  it("marks hopeless plies Forced and excludes them from accuracy", () => {
+    const game = parsePgn(fixture("hopeless.pgn"));
+    expect(game.moves).toHaveLength(2);
+
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "mate", value: -4 }, "h1g2"),
+          line(2, { type: "mate", value: -4 }, "h1g1"),
+        ],
+      },
+      {
+        fen: game.moves[0]?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "mate", value: 3 }, "e1e2"),
+          line(2, { type: "cp", value: 800 }, "e1d1"),
+        ],
+      },
+      {
+        fen: game.moves[1]?.fenAfter ?? "",
+        ply: 2,
+        lines: [
+          line(1, { type: "mate", value: -2 }, "g2g3"),
+          line(2, { type: "mate", value: -2 }, "g2h3"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game,
+      evals,
+      engineId: "sf_18_smallnet",
+    });
+
+    expect(playerWinPercent({ type: "mate", value: -4 })).toBe(0);
+    expect(review.moves[0]?.classification).toBe("forced");
+    expect(review.moves[0]?.classificationLabel).toBe("Forced");
+    expect(review.moves[0]?.accuracy).toBeNull();
+    expect(review.white.movesCounted).toBe(0);
+    expect(review.white.movesExcludedForced).toBe(1);
+    expect(review.white.accuracy).toBe(0);
+  });
+
+  it("reviews Scholar's Mate including the mating ply", () => {
+    const game = parsePgn(fixture("scholars-mate.pgn"));
+    const evals: PositionEval[] = [];
+    for (let ply = 0; ply <= game.moves.length; ply += 1) {
+      const fen =
+        ply === 0 ? game.initialFen : (game.moves[ply - 1]?.fenAfter ?? "");
+      const move = game.moves[ply];
+      const isMatePosition = ply === game.moves.length;
+      evals.push({
+        fen,
+        ply,
+        lines: [
+          line(
+            1,
+            isMatePosition
+              ? { type: "mate", value: 0 }
+              : { type: "cp", value: ply % 2 === 0 ? 30 : -30 },
+            move?.uci ?? "a7a6",
+          ),
+          line(2, { type: "cp", value: 0 }, "a2a3"),
+        ],
+      });
+    }
+
+    const review = reviewGame({
+      game,
+      evals,
+      engineId: "sf_18_smallnet",
+    });
+    expect(review.gameId).toBe("fixture1");
+    expect(review.moves).toHaveLength(7);
+    expect(review.moves[6]?.san).toBe("Qxf7#");
+    expect(review.moves[6]?.classification).toBe("best");
+  });
+
+  it("rejects a wrong number of evals", () => {
+    const game = parsePgn(fixture("hopeless.pgn"));
+    expect(() =>
+      reviewGame({
+        game,
+        evals: [],
+        engineId: "sf_18_smallnet",
+      }),
+    ).toThrow(/Expected 3 position evals/);
+  });
+});

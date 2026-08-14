@@ -1,0 +1,25 @@
+{
+  "name": "@game-review/extension",
+  "version": "0.1.0",
+  "license": "GPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "node scripts/copy-engine-assets.mjs",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "poc:lichess": "node scripts/poc-lichess.mjs",
+    "poc:budget": "node scripts/poc-budget.mjs",
+    "fetch-engine": "node scripts/copy-engine-assets.mjs"
+  },
+  "dependencies": {
+    "@game-review/core": "0.1.0",
+    "@lichess-org/stockfish-web": "^0.4.2",
+    "chess.js": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.6",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.3"
+  }
+}
