@@ -139,6 +139,9 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       bestUci: pv1.pv[0] ?? move.uci,
       playedIsBest,
       alternativeUci: pv2?.pv[0],
+      alternativePlayerWinPercent: pv2
+        ? playerWinPercent(pv2.score)
+        : undefined,
     });
 
     graph.push({

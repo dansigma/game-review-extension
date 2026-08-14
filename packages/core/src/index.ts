@@ -37,6 +37,13 @@ export {
   selectCriticalMoments,
 } from "./criticalMoments.ts";
 export type { CriticalMoment } from "./criticalMoments.ts";
+export {
+  isOnlyMove,
+  ONLY_MOVE_WIN_PERCENT_GAP,
+  onlyMoveWinPercentGap,
+  selectOnlyMoves,
+} from "./onlyMove.ts";
+export type { OnlyMove } from "./onlyMove.ts";
 export { parsePgn, PgnParseError, STANDARD_START_FEN } from "./parsePgn.ts";
 export { reviewGame, ReviewEngineError } from "./reviewEngine.ts";
 export {
