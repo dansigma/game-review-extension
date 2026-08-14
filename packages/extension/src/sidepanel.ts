@@ -6,9 +6,10 @@ import {
 } from "./lichessExport.ts";
 import type { ActiveGameData } from "./messages.ts";
 import {
+  createEnginePort,
   KIWIPETE_FEN,
-  StockfishSession,
-} from "./stockfishSession.ts";
+  type EnginePort,
+} from "./enginePort.ts";
 import { parsePgn } from "@game-review/core";
 import { MVP_GO_COMMAND } from "./budgetDecision.ts";
 
@@ -32,10 +33,9 @@ function setActiveGameId(gameId: string | null): void {
     activeGameIdEl.textContent = gameId ?? "—";
   }
   if (gameIdHintEl instanceof HTMLElement) {
-    gameIdHintEl.textContent =
-      gameId
-        ? "Partida selecionada na página do Lichess."
-        : "Abra uma partida no Lichess e use o botão na página.";
+    gameIdHintEl.textContent = gameId
+      ? "Partida selecionada na página do Lichess."
+      : "Abra uma partida no Lichess e use o botão na página.";
   }
   if (gameIdInput instanceof HTMLInputElement && gameId) {
     gameIdInput.value = gameId;
@@ -85,34 +85,34 @@ function assetBase(): string {
   return chrome.runtime.getURL("engine/");
 }
 
+async function withEngine<T>(fn: (engine: EnginePort) => Promise<T>): Promise<T> {
+  const engine = createEnginePort(assetBase());
+  try {
+    await engine.init();
+    return await fn(engine);
+  } finally {
+    engine.dispose();
+  }
+}
+
 async function runPoc1(): Promise<void> {
   setStatus("PoC 1: loading sf_18_smallnet…");
-  const session = new StockfishSession(assetBase());
-  try {
-    const ready = await session.init();
-    log(`Engine ready: ${ready.engineName} nnue=${ready.nnue ?? "?"}`);
-    const uciLines = await session.handshake();
-    const nameLine = uciLines.find((line) => line.startsWith("id name"));
-    log(nameLine ?? "uciok (no id name line)");
-    log("MultiPV=2, Threads=1, Hash=64");
-    const result = await session.analyzePosition({
+  await withEngine(async (engine) => {
+    const result = await engine.analyzePosition({
       fen: KIWIPETE_FEN,
       go: "nodes 20000",
-      multipv: 2,
     });
-    log(`bestmove ${result.bestMove} (${result.elapsedMs.toFixed(0)} ms, nodes=${result.nodes ?? "?"})`);
+    log(`bestmove ${result.lines[0]?.pv[0] ?? "?"} (MultiPV=${result.lines.length})`);
     for (const line of result.lines) {
       log(
-        `  multipv ${line.multipv ?? 1} score ${line.score?.type} ${line.score?.value} pv ${(line.pv ?? []).slice(0, 6).join(" ")}`,
+        `  multipv ${line.multipv} score ${line.score.type} ${line.score.value} pv ${line.pv.slice(0, 6).join(" ")}`,
       );
     }
     if (result.lines.length < 2) {
       throw new Error("Expected MultiPV=2 lines");
     }
     setStatus("PoC 1 passed: UCI + MultiPV=2 on Kiwipete.");
-  } finally {
-    session.dispose();
-  }
+  });
 }
 
 async function runPoc2(): Promise<void> {
@@ -186,9 +186,7 @@ async function runBudget(args: {
   const fens = [game.initialFen, ...game.moves.map((move) => move.fenAfter)];
   const positions = fens.slice(0, args.plyLimit);
   setStatus(`PoC 3: ${args.label} × ${positions.length} positions`);
-  const session = new StockfishSession(assetBase());
-  try {
-    await session.handshake();
+  await withEngine(async (engine) => {
     const started = performance.now();
     let totalNodes = 0;
     for (let i = 0; i < positions.length; i += 1) {
@@ -196,12 +194,10 @@ async function runBudget(args: {
       if (!fen) {
         continue;
       }
-      const result = await session.analyzePosition({ fen, go: args.go, multipv: 2 });
-      totalNodes += result.nodes ?? 0;
+      const result = await engine.analyzePosition({ fen, go: args.go });
+      totalNodes += result.lines[0]?.nodes ?? 0;
       if (i === 0 || i === positions.length - 1 || (i + 1) % 10 === 0) {
-        log(
-          `  ply ${i + 1}/${positions.length} ${result.elapsedMs.toFixed(0)}ms nodes=${result.nodes ?? "?"}`,
-        );
+        log(`  ply ${i + 1}/${positions.length} nodes=${result.lines[0]?.nodes ?? "?"}`);
       }
     }
     const elapsedMs = performance.now() - started;
@@ -212,9 +208,7 @@ async function runBudget(args: {
     );
     log(`  Extrapolated 80 plies: ${estimate80.toFixed(1)}s (target ≤ 120s)`);
     setStatus(`PoC 3 ${args.label} done.`);
-  } finally {
-    session.dispose();
-  }
+  });
 }
 
 document.querySelector("#poc1")?.addEventListener("click", () => {
@@ -271,6 +265,8 @@ document.querySelector("#poc3-80")?.addEventListener("click", () => {
   );
 });
 
-log("Side Panel pronto. PoCs em seção colapsada.");
+log(
+  "Side Panel pronto. Engine no painel (fecha o painel, cancela). Threads=1; SharedArrayBuffer exigido pelo sf_18_smallnet (COOP/COEP).",
+);
 setStatus("Aguardando");
 void loadActiveGameFromSession();
