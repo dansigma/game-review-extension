@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CBURNETT_SVG } from "../src/ui/chessPieces.ts";
 import {
   boardRowForRank,
   displayYForRank,
@@ -52,5 +53,15 @@ describe("displayYForRank", () => {
 
   it("places 8th rank at the top", () => {
     expect(displayYForRank(7, 35)).toBe(0);
+  });
+});
+
+describe("CBURNETT_SVG", () => {
+  it("vendors all twelve Cburnett piece SVGs", () => {
+    const keys = ["wp", "wn", "wb", "wr", "wq", "wk", "bp", "bn", "bb", "br", "bq", "bk"];
+    expect(Object.keys(CBURNETT_SVG).sort()).toEqual([...keys].sort());
+    for (const key of keys) {
+      expect(CBURNETT_SVG[key]).toContain("<svg");
+    }
   });
 });

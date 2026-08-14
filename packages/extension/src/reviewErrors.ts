@@ -1,17 +1,10 @@
+import { formatLichessExportHttpError } from "./lichessExport.ts";
 import { LichessProviderError } from "./lichessProvider.ts";
+
+export { formatLichessExportHttpError };
 
 export const ENGINE_LOAD_ERROR_PT =
   "Motor de análise não carregou — feche e reabra o painel";
-
-export function formatLichessExportHttpError(status: number): string {
-  if (status === 404) {
-    return "Partida não encontrada";
-  }
-  if (status === 429) {
-    return "Muitas requisições — tente novamente mais tarde";
-  }
-  return `Erro ao carregar partida (HTTP ${status})`;
-}
 
 function isEngineLoadFailure(message: string): boolean {
   const lower = message.toLowerCase();

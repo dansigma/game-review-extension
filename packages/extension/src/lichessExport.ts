@@ -1,5 +1,3 @@
-import { formatLichessExportHttpError } from "./reviewErrors.ts";
-
 export const LICHESS_EXPORT_URL = "https://lichess.org/game/export";
 
 export const LICHESS_GAME_ID_RE = /^[a-zA-Z0-9]{8}$/;
@@ -25,6 +23,16 @@ export interface LichessExportJson {
     white?: { user?: { name?: string }; rating?: number };
     black?: { user?: { name?: string }; rating?: number };
   };
+}
+
+export function formatLichessExportHttpError(status: number): string {
+  if (status === 404) {
+    return "Partida não encontrada";
+  }
+  if (status === 429) {
+    return "Muitas requisições — tente novamente mais tarde";
+  }
+  return `Erro ao carregar partida (HTTP ${status})`;
 }
 
 export function isLiveStatus(status: string): boolean {

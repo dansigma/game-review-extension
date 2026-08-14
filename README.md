@@ -60,6 +60,7 @@ Win% usa a curva logística do Lichess (`0.00368208`). Precisão **não** usa `1
 
 - Extensão e `packages/core`: **GPL-3.0-only**
 - Motor embutido: Stockfish (GPL) via `@lichess-org/stockfish-web` (AGPL-3.0-or-later)
+- Peças do tabuleiro: set **Cburnett** (Wikimedia), GPL / CC BY-SA 3.0. Não é chessground.
 
 ## Fora do MVP
 
