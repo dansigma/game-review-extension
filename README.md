@@ -25,7 +25,7 @@ npm run build:extension
 1. `npm run build:extension`
 2. `chrome://extensions` → Modo do desenvolvedor → **Carregar sem compactação**
 3. Selecione a pasta `packages/extension/dist`
-4. Abra uma partida **finalizada** no Lichess e use o botão na página ou o ícone da extensão para abrir o Side Panel
+4. Abra uma partida **finalizada** no Lichess e use o botão na página ou o ícone da extensão para abrir o Side Panel — **ou** cole/abra um PGN no Side Panel (sem aba do Lichess)
 
 **Cancelar análise:** feche o Side Panel ou use **Cancelar** durante a análise. A análise interrompida não é salva no cache.
 
@@ -33,7 +33,7 @@ npm run build:extension
 
 ## Cache IndexedDB (MVP)
 
-Reabrir a mesma partida finalizada não reexecuta o Stockfish se o cache acertar. A chave inclui:
+Reabrir a mesma partida finalizada (Lichess ou PGN colado) não reexecuta o Stockfish se o cache acertar. A chave inclui:
 
 - `gameId`
 - `algoVersion` (`epl-v1`)
@@ -64,4 +64,4 @@ Win% usa a curva logística do Lichess (`0.00368208`). Precisão **não** usa `1
 
 ## Fora do MVP
 
-Sem conta, sem backend, sem Chess.com, sem Brilliant, sem engine em partida ao vivo. Não é fork de Pawn Appétit nem de chess.com.puter.
+Sem conta, sem backend, sem Chess.com, sem Brilliant, sem engine em partida ao vivo, sem importar várias partidas de um único arquivo PGN. Não é fork de Pawn Appétit nem de chess.com.puter.
