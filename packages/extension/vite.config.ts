@@ -17,10 +17,14 @@ export default defineConfig({
       input: {
         sidepanel: resolve(root, "sidepanel.html"),
         background: resolve(root, "src/background.ts"),
+        lichessGameCta: resolve(root, "src/content/lichessGameCta.ts"),
       },
       output: {
-        entryFileNames: (chunk) =>
-          chunk.name === "background" ? "background.js" : "assets/[name].js",
+        entryFileNames: (chunk) => {
+          if (chunk.name === "background") return "background.js";
+          if (chunk.name === "lichessGameCta") return "content/lichessGameCta.js";
+          return "assets/[name].js";
+        },
         chunkFileNames: "assets/[name].js",
         assetFileNames: "assets/[name][extname]",
       },

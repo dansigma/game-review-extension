@@ -4,6 +4,7 @@ import {
   summarizeExport,
   type LichessExportJson,
 } from "./lichessExport.ts";
+import type { ActiveGameData } from "./messages.ts";
 import {
   KIWIPETE_FEN,
   StockfishSession,
@@ -13,6 +14,9 @@ import { MVP_GO_COMMAND } from "./budgetDecision.ts";
 
 const logEl = document.querySelector("#log");
 const statusEl = document.querySelector("#status");
+const activeGameIdEl = document.querySelector("#active-game-id");
+const gameIdHintEl = document.querySelector("#game-id-hint");
+const gameIdInput = document.querySelector("#game-id");
 
 function log(message: string): void {
   if (!(logEl instanceof HTMLElement)) {
@@ -22,6 +26,44 @@ function log(message: string): void {
   logEl.textContent += `[${time}] ${message}\n`;
   logEl.scrollTop = logEl.scrollHeight;
 }
+
+function setActiveGameId(gameId: string | null): void {
+  if (activeGameIdEl instanceof HTMLElement) {
+    activeGameIdEl.textContent = gameId ?? "—";
+  }
+  if (gameIdHintEl instanceof HTMLElement) {
+    gameIdHintEl.textContent =
+      gameId
+        ? "Partida selecionada na página do Lichess."
+        : "Abra uma partida no Lichess e use o botão na página.";
+  }
+  if (gameIdInput instanceof HTMLInputElement && gameId) {
+    gameIdInput.value = gameId;
+  }
+}
+
+async function loadActiveGameFromSession(): Promise<void> {
+  const response = await chrome.runtime.sendMessage({ type: "get-active-game" });
+  if (!response || response.ok !== true) {
+    return;
+  }
+  const data = response.data as ActiveGameData | null;
+  if (data?.gameId) {
+    setActiveGameId(data.gameId);
+    setStatus(`Partida ${data.gameId}`);
+  }
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "session" || !changes.activeGameId) {
+    return;
+  }
+  const next = changes.activeGameId.newValue;
+  if (typeof next === "string" && next.length > 0) {
+    setActiveGameId(next);
+    setStatus(`Partida ${next}`);
+  }
+});
 
 function setStatus(text: string): void {
   if (statusEl instanceof HTMLElement) {
@@ -229,5 +271,6 @@ document.querySelector("#poc3-80")?.addEventListener("click", () => {
   );
 });
 
-log("Side Panel PoCs. Engine stays here (dies if the panel closes). Threads=1, no SAB required by us.");
-setStatus("Idle");
+log("Side Panel pronto. PoCs em seção colapsada.");
+setStatus("Aguardando");
+void loadActiveGameFromSession();
