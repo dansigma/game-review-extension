@@ -1,0 +1,11 @@
+{
+  "games": [
+    {
+      "url": "https://www.chess.com/game/live/142074276742",
+      "rules": "chess",
+      "white": { "username": "AliceChess", "rating": 1500 },
+      "black": { "username": "BobChess", "rating": 1400 },
+      "pgn": "[Event \"Live Chess\"]\n[Site \"Chess.com\"]\n[Date \"2024.03.15\"]\n[White \"AliceChess\"]\n[Black \"BobChess\"]\n[Result \"1-0\"]\n[WhiteElo \"1500\"]\n[BlackElo \"1400\"]\n[TimeControl \"300\"]\n[Variant \"Standard\"]\n\n1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0"
+    }
+  ]
+}

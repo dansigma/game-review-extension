@@ -4,11 +4,21 @@ import {
   summarizeExport,
   type LichessExportJson,
 } from "./lichessExport.ts";
+import {
+  buildChesscomTaggedGameId,
+  extractChesscomGameRef,
+  type ChesscomArchiveJson,
+  type ChesscomCallbackJson,
+  type ChesscomGameKind,
+} from "./chesscomExport.ts";
+import { isChesscomTaggedGameId, loadChesscomGame } from "./chesscomProvider.ts";
 import { loadLichessGame } from "./lichessProvider.ts";
 import { loadPgnGame } from "./pgnProvider.ts";
 import {
   gameCardHint,
   isLichessSessionGameId,
+  isSessionReloadableGameId,
+  sessionGameLoadSource,
   type GameLoadSource,
 } from "./gameCardDisplay.ts";
 import type { ActiveGameData } from "./messages.ts";
@@ -85,19 +95,19 @@ function log(message: string): void {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-function setSessionLichessGameId(gameId: string | null): void {
+function setSessionGameId(gameId: string | null): void {
   activeGameId = gameId;
   if (activeGameIdEl instanceof HTMLElement) {
     activeGameIdEl.textContent = gameId ?? "—";
   }
   if (gameIdHintEl instanceof HTMLElement) {
-    gameIdHintEl.textContent = gameCardHint(gameId ? "lichess" : null);
+    gameIdHintEl.textContent = gameCardHint(sessionGameLoadSource(gameId));
   }
-  if (gameIdInput instanceof HTMLInputElement && gameId) {
+  if (gameIdInput instanceof HTMLInputElement && gameId && isLichessSessionGameId(gameId)) {
     gameIdInput.value = gameId;
   }
   if (loadGameButton instanceof HTMLButtonElement) {
-    loadGameButton.disabled = !isLichessSessionGameId(gameId);
+    loadGameButton.disabled = !isSessionReloadableGameId(gameId);
   }
   if (!gameId) {
     clearGameSummary();
@@ -183,15 +193,42 @@ async function finishLoadingGame(
   );
 }
 
+async function fetchChesscomCallback(
+  kind: ChesscomGameKind,
+  id: string,
+): Promise<ChesscomCallbackJson> {
+  return (await sendBackground({
+    type: "chesscom-callback",
+    kind,
+    id,
+  })) as ChesscomCallbackJson;
+}
+
+async function fetchChesscomArchive(
+  username: string,
+  year: number,
+  month: number,
+): Promise<ChesscomArchiveJson> {
+  return (await sendBackground({
+    type: "chesscom-archive",
+    username,
+    year,
+    month,
+  })) as ChesscomArchiveJson;
+}
+
 async function loadActiveGame(): Promise<void> {
-  if (!isLichessSessionGameId(activeGameId)) {
+  if (!activeGameId || !isSessionReloadableGameId(activeGameId)) {
     return;
   }
   setStatus(`Carregando ${activeGameId}…`);
   clearGameSummary();
   try {
-    const game = await loadLichessGame(activeGameId, fetchLichessExport);
-    await finishLoadingGame(game, "lichess");
+    const source = sessionGameLoadSource(activeGameId);
+    const game = isChesscomTaggedGameId(activeGameId)
+      ? await loadChesscomGame(activeGameId, fetchChesscomCallback, fetchChesscomArchive)
+      : await loadLichessGame(activeGameId, fetchLichessExport);
+    await finishLoadingGame(game, source ?? "lichess");
   } catch (error: unknown) {
     const text = formatReviewError(error);
     showLoadError(text);
@@ -225,7 +262,18 @@ function maybeAutoLoadGame(gameId: string): void {
 async function gameIdFromActiveTab(): Promise<string | undefined> {
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const url = tabs[0]?.url;
-  return url ? extractGameId(url) : undefined;
+  if (!url) {
+    return undefined;
+  }
+  const lichessId = extractGameId(url);
+  if (lichessId) {
+    return lichessId;
+  }
+  const chesscomRef = extractChesscomGameRef(url);
+  if (chesscomRef) {
+    return buildChesscomTaggedGameId(chesscomRef.kind, chesscomRef.id);
+  }
+  return undefined;
 }
 
 async function loadActiveGameFromSession(): Promise<void> {
@@ -233,7 +281,7 @@ async function loadActiveGameFromSession(): Promise<void> {
   if (response && response.ok === true) {
     const data = response.data as ActiveGameData | null;
     if (data?.gameId) {
-      setSessionLichessGameId(data.gameId);
+      setSessionGameId(data.gameId);
       setStatus(`Partida ${data.gameId}`);
       maybeAutoLoadGame(data.gameId);
       return;
@@ -245,7 +293,7 @@ async function loadActiveGameFromSession(): Promise<void> {
     if (!fromTab) {
       return;
     }
-    setSessionLichessGameId(fromTab);
+    setSessionGameId(fromTab);
     setStatus(`Partida ${fromTab}`);
     maybeAutoLoadGame(fromTab);
   } catch (error: unknown) {
@@ -259,7 +307,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
   const next = changes.activeGameId.newValue;
   if (typeof next === "string" && next.length > 0) {
-    setSessionLichessGameId(next);
+    setSessionGameId(next);
     setStatus(`Partida ${next}`);
     maybeAutoLoadGame(next);
   }
@@ -272,7 +320,11 @@ function setStatus(text: string): void {
 }
 
 async function sendBackground(
-  message: { type: "lichess-export"; gameId: string } | { type: "lichess-tv" },
+  message:
+    | { type: "lichess-export"; gameId: string }
+    | { type: "lichess-tv" }
+    | { type: "chesscom-callback"; kind: ChesscomGameKind; id: string }
+    | { type: "chesscom-archive"; username: string; year: number; month: number },
 ): Promise<unknown> {
   const response = await chrome.runtime.sendMessage(message);
   if (!response || response.ok !== true) {

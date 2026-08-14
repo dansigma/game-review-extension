@@ -1,4 +1,9 @@
 import { PgnParseError } from "@game-review/core";
+import {
+  formatChesscomArchiveHttpError,
+  formatChesscomCallbackHttpError,
+} from "./chesscomExport.ts";
+import { ChesscomProviderError } from "./chesscomProvider.ts";
 import { formatLichessExportHttpError } from "./lichessExport.ts";
 import { LichessProviderError } from "./lichessProvider.ts";
 import { PgnProviderError } from "./pgnProvider.ts";
@@ -38,6 +43,10 @@ export function formatReviewError(error: unknown): string {
     return error.message;
   }
 
+  if (error instanceof ChesscomProviderError) {
+    return error.message;
+  }
+
   if (error instanceof PgnProviderError) {
     return error.message;
   }
@@ -51,6 +60,16 @@ export function formatReviewError(error: unknown): string {
   const httpMatch = /Lichess export HTTP (\d+)/.exec(text);
   if (httpMatch) {
     return formatLichessExportHttpError(Number(httpMatch[1]));
+  }
+
+  const chesscomCallbackMatch = /Chess\.com \(HTTP (\d+)\)/.exec(text);
+  if (chesscomCallbackMatch) {
+    return formatChesscomCallbackHttpError(Number(chesscomCallbackMatch[1]));
+  }
+
+  const chesscomArchiveMatch = /arquivo Chess\.com \(HTTP (\d+)\)/.exec(text);
+  if (chesscomArchiveMatch) {
+    return formatChesscomArchiveHttpError(Number(chesscomArchiveMatch[1]));
   }
 
   if (

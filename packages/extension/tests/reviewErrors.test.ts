@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PgnParseError } from "@game-review/core";
+import { ChesscomProviderError } from "../src/chesscomProvider.ts";
 import { LIVE_GAME_MESSAGE_PT } from "../src/lichessProvider.ts";
 import {
   EMPTY_PGN_MESSAGE_PT,
@@ -43,6 +44,9 @@ describe("formatReviewError", () => {
 
   it("keeps live game message", () => {
     expect(formatReviewError(new Error(LIVE_GAME_MESSAGE_PT))).toBe(
+      LIVE_GAME_MESSAGE_PT,
+    );
+    expect(formatReviewError(new ChesscomProviderError(LIVE_GAME_MESSAGE_PT))).toBe(
       LIVE_GAME_MESSAGE_PT,
     );
   });
