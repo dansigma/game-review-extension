@@ -1,8 +1,11 @@
 import {
   MOVE_CLASS_LABEL_PT,
+  selectCriticalMoments,
+  type CriticalMoment,
   type GameReview,
   type MoveClass,
   type NormalizedGame,
+  type PlayerColor,
   type ReviewedMove,
 } from "@game-review/core";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
@@ -35,6 +38,8 @@ export interface GameReviewPanelElements {
   navStart: HTMLButtonElement;
   navEnd: HTMLButtonElement;
   plyLabel: HTMLElement;
+  criticalMomentsBlock: HTMLElement;
+  criticalMomentsList: HTMLElement;
 }
 
 export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements {
@@ -99,6 +104,8 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     navStart,
     navEnd,
     plyLabel: requireEl("#ply-label"),
+    criticalMomentsBlock: requireEl("#critical-moments"),
+    criticalMomentsList: requireEl("#critical-moments-list"),
   };
 }
 
@@ -165,6 +172,7 @@ export class GameReviewPanel {
     this.el.analyzeButton.hidden = true;
     this.el.resultsBlock.hidden = false;
     this.renderSummary();
+    this.renderCriticalMoments();
     this.renderMoveList();
     this.refreshView();
   }
@@ -185,6 +193,55 @@ export class GameReviewPanel {
     this.el.summaryAccuracy.textContent =
       `Precisão: Brancas ${this.review.white.accuracy.toFixed(1)}% · ` +
       `Pretas ${this.review.black.accuracy.toFixed(1)}%`;
+  }
+
+  private renderCriticalMoments(): void {
+    if (!this.review) {
+      return;
+    }
+    const moments = selectCriticalMoments(this.review.moves);
+    const list = this.el.criticalMomentsList;
+    list.replaceChildren();
+
+    if (moments.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "critical-moments-empty";
+      empty.textContent = "Nenhum momento crítico nesta partida.";
+      list.appendChild(empty);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const moment of moments) {
+      frag.appendChild(this.criticalMomentItem(moment));
+    }
+    list.appendChild(frag);
+  }
+
+  private criticalMomentItem(moment: CriticalMoment): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `critical-moment-btn ${CLASS_CSS[moment.classification]}`;
+    btn.dataset.ply = String(moment.ply);
+
+    const main = document.createElement("span");
+    main.className = "critical-moment-main";
+    main.innerHTML =
+      `<span class="critical-moment-move">${escapeHtml(formatMoveRef(moment.ply, moment.color, moment.san))}</span>` +
+      `<span class="critical-moment-color">${escapeHtml(colorLabelPt(moment.color))}</span>`;
+
+    const meta = document.createElement("span");
+    meta.className = "critical-moment-meta";
+    meta.innerHTML =
+      `<span class="critical-moment-class">${escapeHtml(MOVE_CLASS_LABEL_PT[moment.classification])}</span>` +
+      `<span class="critical-moment-stats">EPL ${moment.epl.toFixed(2)} · ${formatWinSwing(moment.winPercentSwing)}</span>`;
+
+    btn.append(main, meta);
+    btn.addEventListener("click", () => this.goToPly(moment.ply));
+    if (moment.ply === this.currentPly) {
+      btn.classList.add("critical-moment-active");
+    }
+    return btn;
   }
 
   private renderMoveList(): void {
@@ -258,6 +315,14 @@ export class GameReviewPanel {
       const ply = Number(btn.dataset.ply);
       btn.classList.toggle("move-active", ply === this.currentPly);
     }
+    for (const btn of Array.from(
+      this.el.criticalMomentsList.querySelectorAll<HTMLButtonElement>(
+        ".critical-moment-btn",
+      ),
+    )) {
+      const ply = Number(btn.dataset.ply);
+      btn.classList.toggle("critical-moment-active", ply === this.currentPly);
+    }
   }
 
   private updateNav(): void {
@@ -310,6 +375,29 @@ function pairMoves(moves: readonly ReviewedMove[]): MoveRow[] {
     });
   }
   return rows;
+}
+
+function formatMoveRef(ply: number, color: PlayerColor, san: string): string {
+  const moveNum = Math.floor(ply / 2) + 1;
+  if (color === "white") {
+    return `${moveNum}. ${san}`;
+  }
+  return `${moveNum}... ${san}`;
+}
+
+function colorLabelPt(color: PlayerColor): string {
+  return color === "white" ? "Brancas" : "Pretas";
+}
+
+function formatWinSwing(swing: number): string {
+  const rounded = Math.round(swing);
+  if (rounded > 0) {
+    return `−${rounded}% win`;
+  }
+  if (rounded < 0) {
+    return `+${Math.abs(rounded)}% win`;
+  }
+  return "0% win";
 }
 
 function formatResult(result: string): string {

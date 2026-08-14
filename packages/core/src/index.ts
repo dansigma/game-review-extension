@@ -31,6 +31,12 @@ export {
   trimmedMean,
 } from "./accuracy.ts";
 export { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
+export {
+  CRITICAL_EPL_MIN,
+  CRITICAL_MAX_PER_COLOR,
+  selectCriticalMoments,
+} from "./criticalMoments.ts";
+export type { CriticalMoment } from "./criticalMoments.ts";
 export { parsePgn, PgnParseError, STANDARD_START_FEN } from "./parsePgn.ts";
 export { reviewGame, ReviewEngineError } from "./reviewEngine.ts";
 export {
