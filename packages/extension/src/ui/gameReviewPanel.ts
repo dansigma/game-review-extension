@@ -1,0 +1,334 @@
+import {
+  MOVE_CLASS_LABEL_PT,
+  type GameReview,
+  type MoveClass,
+  type NormalizedGame,
+  type ReviewedMove,
+} from "@game-review/core";
+import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
+import { renderEvalGraph } from "./evalGraph.ts";
+
+const CLASS_CSS: Record<MoveClass, string> = {
+  best: "move-best",
+  good: "move-good",
+  inaccuracy: "move-inaccuracy",
+  mistake: "move-mistake",
+  blunder: "move-blunder",
+  forced: "move-forced",
+};
+
+export interface GameReviewPanelElements {
+  reviewSection: HTMLElement;
+  analyzeButton: HTMLButtonElement;
+  progressBlock: HTMLElement;
+  progressBar: HTMLProgressElement;
+  progressLabel: HTMLElement;
+  cancelButton: HTMLButtonElement;
+  resultsBlock: HTMLElement;
+  summaryResult: HTMLElement;
+  summaryAccuracy: HTMLElement;
+  boardHost: HTMLElement;
+  evalCanvas: HTMLCanvasElement;
+  moveList: HTMLElement;
+  navPrev: HTMLButtonElement;
+  navNext: HTMLButtonElement;
+  navStart: HTMLButtonElement;
+  navEnd: HTMLButtonElement;
+  plyLabel: HTMLElement;
+}
+
+export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements {
+  const requireEl = <T extends HTMLElement>(selector: string): T => {
+    const el = root.querySelector(selector);
+    if (!(el instanceof HTMLElement)) {
+      throw new Error(`Missing element: ${selector}`);
+    }
+    return el as T;
+  };
+
+  const analyzeButton = root.querySelector("#analyze-game");
+  const cancelButton = root.querySelector("#cancel-analysis");
+  const progressBar = root.querySelector("#analysis-progress-bar");
+  const navPrev = root.querySelector("#nav-prev");
+  const navNext = root.querySelector("#nav-next");
+  const navStart = root.querySelector("#nav-start");
+  const navEnd = root.querySelector("#nav-end");
+
+  if (!(analyzeButton instanceof HTMLButtonElement)) {
+    throw new Error("Missing #analyze-game");
+  }
+  if (!(cancelButton instanceof HTMLButtonElement)) {
+    throw new Error("Missing #cancel-analysis");
+  }
+  if (!(progressBar instanceof HTMLProgressElement)) {
+    throw new Error("Missing #analysis-progress-bar");
+  }
+  if (!(navPrev instanceof HTMLButtonElement)) {
+    throw new Error("Missing #nav-prev");
+  }
+  if (!(navNext instanceof HTMLButtonElement)) {
+    throw new Error("Missing #nav-next");
+  }
+  if (!(navStart instanceof HTMLButtonElement)) {
+    throw new Error("Missing #nav-start");
+  }
+  if (!(navEnd instanceof HTMLButtonElement)) {
+    throw new Error("Missing #nav-end");
+  }
+
+  const evalCanvas = root.querySelector("#eval-graph");
+  if (!(evalCanvas instanceof HTMLCanvasElement)) {
+    throw new Error("Missing #eval-graph");
+  }
+
+  return {
+    reviewSection: requireEl("#review-section"),
+    analyzeButton,
+    progressBlock: requireEl("#analysis-progress"),
+    progressBar,
+    progressLabel: requireEl("#analysis-progress-label"),
+    cancelButton,
+    resultsBlock: requireEl("#review-results"),
+    summaryResult: requireEl("#review-summary-result"),
+    summaryAccuracy: requireEl("#review-summary-accuracy"),
+    boardHost: requireEl("#board-host"),
+    evalCanvas,
+    moveList: requireEl("#move-list"),
+    navPrev,
+    navNext,
+    navStart,
+    navEnd,
+    plyLabel: requireEl("#ply-label"),
+  };
+}
+
+export class GameReviewPanel {
+  private game: NormalizedGame | null = null;
+  private review: GameReview | null = null;
+  private currentPly = -1;
+  private onAnalyze: (() => void) | null = null;
+  private onCancel: (() => void) | null = null;
+
+  constructor(private readonly el: GameReviewPanelElements) {
+    el.analyzeButton.addEventListener("click", () => this.onAnalyze?.());
+    el.cancelButton.addEventListener("click", () => this.onCancel?.());
+    el.navPrev.addEventListener("click", () => this.step(-1));
+    el.navNext.addEventListener("click", () => this.step(1));
+    el.navStart.addEventListener("click", () => this.goToPly(-1));
+    el.navEnd.addEventListener("click", () => {
+      const max = (this.game?.moves.length ?? 1) - 1;
+      this.goToPly(max);
+    });
+    el.evalCanvas.addEventListener("click", (event) => this.onGraphClick(event));
+    window.addEventListener("resize", () => this.refreshView());
+  }
+
+  setHandlers(handlers: {
+    onAnalyze: () => void;
+    onCancel: () => void;
+  }): void {
+    this.onAnalyze = handlers.onAnalyze;
+    this.onCancel = handlers.onCancel;
+  }
+
+  setGame(game: NormalizedGame | null): void {
+    this.game = game;
+    this.review = null;
+    this.currentPly = -1;
+    if (!game) {
+      this.el.reviewSection.hidden = true;
+      return;
+    }
+    this.el.reviewSection.hidden = false;
+    this.el.analyzeButton.hidden = false;
+    this.el.analyzeButton.disabled = false;
+    this.el.progressBlock.hidden = true;
+    this.el.resultsBlock.hidden = true;
+    this.el.moveList.replaceChildren();
+    this.el.boardHost.replaceChildren();
+  }
+
+  showAnalyzing(done: number, total: number): void {
+    this.el.analyzeButton.hidden = true;
+    this.el.progressBlock.hidden = false;
+    this.el.resultsBlock.hidden = true;
+    this.el.progressBar.max = total;
+    this.el.progressBar.value = done;
+    this.el.progressLabel.textContent = `Analisando… ${done}/${total}`;
+  }
+
+  showReview(review: GameReview, game: NormalizedGame): void {
+    this.review = review;
+    this.game = game;
+    this.currentPly = -1;
+    this.el.progressBlock.hidden = true;
+    this.el.analyzeButton.hidden = true;
+    this.el.resultsBlock.hidden = false;
+    this.renderSummary();
+    this.renderMoveList();
+    this.refreshView();
+  }
+
+  showAnalyzeReady(): void {
+    this.el.progressBlock.hidden = true;
+    this.el.analyzeButton.hidden = false;
+    this.el.analyzeButton.disabled = false;
+  }
+
+  private renderSummary(): void {
+    if (!this.game || !this.review) {
+      return;
+    }
+    const { white, black } = this.game.players;
+    const resultLabel = formatResult(this.game.result);
+    this.el.summaryResult.textContent = `${white.name} vs ${black.name} — ${resultLabel}`;
+    this.el.summaryAccuracy.textContent =
+      `Precisão: Brancas ${this.review.white.accuracy.toFixed(1)}% · ` +
+      `Pretas ${this.review.black.accuracy.toFixed(1)}%`;
+  }
+
+  private renderMoveList(): void {
+    if (!this.review) {
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    const rows = pairMoves(this.review.moves);
+    for (const row of rows) {
+      const tr = document.createElement("tr");
+      tr.appendChild(this.moveCell(row.number, null, -1));
+      tr.appendChild(this.moveCell(row.number, row.white, row.white?.ply ?? -1));
+      tr.appendChild(this.moveCell(null, row.black, row.black?.ply ?? -1));
+      frag.appendChild(tr);
+    }
+    this.el.moveList.replaceChildren(frag);
+  }
+
+  private moveCell(
+    moveNumber: number | null,
+    move: ReviewedMove | null,
+    ply: number,
+  ): HTMLTableCellElement {
+    const td = document.createElement("td");
+    if (moveNumber !== null && move === null) {
+      td.className = "move-num";
+      td.textContent = `${moveNumber}.`;
+      return td;
+    }
+    if (!move) {
+      td.className = "move-empty";
+      return td;
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `move-btn ${CLASS_CSS[move.classification]}`;
+    btn.dataset.ply = String(ply);
+    btn.title = MOVE_CLASS_LABEL_PT[move.classification];
+    btn.innerHTML =
+      `<span class="move-san">${escapeHtml(move.san)}</span>` +
+      `<span class="move-class">${escapeHtml(move.classificationLabel)}</span>`;
+    if (ply === this.currentPly) {
+      btn.classList.add("move-active");
+    }
+    btn.addEventListener("click", () => this.goToPly(ply));
+    td.appendChild(btn);
+    return td;
+  }
+
+  private refreshView(): void {
+    if (!this.game) {
+      return;
+    }
+    const fensAfter = this.game.moves.map((m) => m.fenAfter);
+    const fen = fenAtPly(this.game.initialFen, fensAfter, this.currentPly);
+    const move =
+      this.currentPly >= 0 ? this.game.moves[this.currentPly] : undefined;
+    const highlight = move ? uciSquares(move.uci) : null;
+    renderChessBoard(this.el.boardHost, fen, highlight ?? undefined);
+    if (this.review) {
+      renderEvalGraph(this.el.evalCanvas, this.review.graph, this.currentPly);
+    }
+    this.updateNav();
+    this.highlightActiveMove();
+  }
+
+  private highlightActiveMove(): void {
+    for (const btn of Array.from(
+      this.el.moveList.querySelectorAll<HTMLButtonElement>(".move-btn"),
+    )) {
+      const ply = Number(btn.dataset.ply);
+      btn.classList.toggle("move-active", ply === this.currentPly);
+    }
+  }
+
+  private updateNav(): void {
+    const max = (this.game?.moves.length ?? 0) - 1;
+    this.el.navPrev.disabled = this.currentPly <= -1;
+    this.el.navNext.disabled = this.currentPly >= max;
+    const label =
+      this.currentPly < 0
+        ? "Posição inicial"
+        : `Lance ${this.currentPly + 1} / ${max + 1}`;
+    this.el.plyLabel.textContent = label;
+  }
+
+  private step(delta: number): void {
+    this.goToPly(this.currentPly + delta);
+  }
+
+  private goToPly(ply: number): void {
+    const max = (this.game?.moves.length ?? 0) - 1;
+    this.currentPly = Math.max(-1, Math.min(max, ply));
+    this.refreshView();
+  }
+
+  private onGraphClick(event: MouseEvent): void {
+    if (!this.review || this.review.graph.length === 0) {
+      return;
+    }
+    const rect = this.el.evalCanvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const ratio = x / rect.width;
+    const maxPly = Math.max(...this.review.graph.map((p) => p.ply), 1);
+    const targetPly = Math.round(ratio * (maxPly + 1)) - 1;
+    this.goToPly(targetPly);
+  }
+}
+
+interface MoveRow {
+  number: number;
+  white: ReviewedMove | null;
+  black: ReviewedMove | null;
+}
+
+function pairMoves(moves: readonly ReviewedMove[]): MoveRow[] {
+  const rows: MoveRow[] = [];
+  for (let i = 0; i < moves.length; i += 2) {
+    rows.push({
+      number: Math.floor(i / 2) + 1,
+      white: moves[i] ?? null,
+      black: moves[i + 1] ?? null,
+    });
+  }
+  return rows;
+}
+
+function formatResult(result: string): string {
+  switch (result) {
+    case "1-0":
+      return "1-0 (Brancas)";
+    case "0-1":
+      return "0-1 (Pretas)";
+    case "1/2-1/2":
+      return "Empate";
+    default:
+      return result;
+  }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}

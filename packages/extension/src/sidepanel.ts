@@ -14,6 +14,11 @@ import {
 import type { NormalizedGame } from "@game-review/core";
 import { parsePgn } from "@game-review/core";
 import { MVP_GO_COMMAND } from "./budgetDecision.ts";
+import { reviewGameWithEngine } from "./reviewWithEngine.ts";
+import {
+  GameReviewPanel,
+  queryGameReviewPanel,
+} from "./ui/gameReviewPanel.ts";
 
 const logEl = document.querySelector("#log");
 const statusEl = document.querySelector("#status");
@@ -29,6 +34,11 @@ const loadErrorEl = document.querySelector("#load-error");
 
 let activeGameId: string | null = null;
 let autoLoadAttemptedFor: string | null = null;
+let loadedGame: NormalizedGame | null = null;
+let analysisEngine: EnginePort | null = null;
+let analysisAbort: AbortController | null = null;
+
+const reviewPanel = new GameReviewPanel(queryGameReviewPanel(document));
 
 function log(message: string): void {
   if (!(logEl instanceof HTMLElement)) {
@@ -61,6 +71,8 @@ function setActiveGameId(gameId: string | null): void {
 }
 
 function clearGameSummary(): void {
+  loadedGame = null;
+  reviewPanel.setGame(null);
   if (gameSummaryEl instanceof HTMLElement) {
     gameSummaryEl.hidden = true;
   }
@@ -119,7 +131,9 @@ async function loadActiveGame(): Promise<void> {
   clearGameSummary();
   try {
     const game = await loadLichessGame(activeGameId, fetchLichessExport);
+    loadedGame = game;
     showGameSummary(game);
+    reviewPanel.setGame(game);
     setStatus(`Partida ${game.gameId} carregada`);
     log(
       `loaded ${game.gameId}: ${game.players.white.name} vs ${game.players.black.name}, ${game.result}, ${game.moves.length} plies`,
@@ -313,6 +327,74 @@ async function runBudget(args: {
 
 loadGameButton?.addEventListener("click", () => {
   void loadActiveGame();
+});
+
+function cancelAnalysis(): void {
+  analysisAbort?.abort();
+}
+
+async function runGameReview(): Promise<void> {
+  if (!loadedGame) {
+    return;
+  }
+  if (analysisEngine) {
+    return;
+  }
+
+  const game = loadedGame;
+  const total = game.moves.length + 1;
+  analysisAbort = new AbortController();
+  const { signal } = analysisAbort;
+
+  analysisEngine = createEnginePort(assetBase());
+  reviewPanel.showAnalyzing(0, total);
+  setStatus("Analisando partida…");
+
+  try {
+    await analysisEngine.init();
+    const review = await reviewGameWithEngine(analysisEngine, {
+      game,
+      signal,
+      onProgress: (done, progressTotal) => {
+        reviewPanel.showAnalyzing(done, progressTotal);
+        setStatus(`Analisando… ${done}/${progressTotal}`);
+      },
+    });
+    reviewPanel.showReview(review, game);
+    setStatus("Análise concluída");
+    log(
+      `review ${game.gameId}: white ${review.white.accuracy.toFixed(1)}% black ${review.black.accuracy.toFixed(1)}%`,
+    );
+  } catch (error: unknown) {
+    if (signal.aborted) {
+      reviewPanel.showAnalyzeReady();
+      setStatus("Análise cancelada");
+      log("analysis cancelled");
+      return;
+    }
+    const text = error instanceof Error ? error.message : String(error);
+    reviewPanel.showAnalyzeReady();
+    setStatus("Falha na análise");
+    log(`analysis failed: ${text}`);
+  } finally {
+    analysisEngine?.dispose();
+    analysisEngine = null;
+    analysisAbort = null;
+  }
+}
+
+reviewPanel.setHandlers({
+  onAnalyze: () => {
+    void runGameReview();
+  },
+  onCancel: () => {
+    cancelAnalysis();
+  },
+});
+
+window.addEventListener("beforeunload", () => {
+  cancelAnalysis();
+  analysisEngine?.dispose();
 });
 
 document.querySelector("#poc1")?.addEventListener("click", () => {
