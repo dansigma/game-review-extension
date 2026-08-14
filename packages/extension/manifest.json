@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Game Review",
+  "name": "Game Review PoCs",
   "version": "0.1.0",
-  "description": "Análise pós-partida no Lichess. Stockfish local. GPL-3.0.",
+  "description": "SIG-652: Stockfish 18 WASM, Lichess export, analysis budget. Post-game only.",
   "minimum_chrome_version": "116",
-  "permissions": ["sidePanel", "tabs", "storage"],
+  "permissions": ["sidePanel"],
   "host_permissions": ["https://lichess.org/*"],
   "background": {
     "service_worker": "background.js",
@@ -14,15 +14,8 @@
     "default_path": "sidepanel.html"
   },
   "action": {
-    "default_title": "Game Review"
+    "default_title": "Game Review PoCs"
   },
-  "content_scripts": [
-    {
-      "matches": ["https://lichess.org/*"],
-      "js": ["content/lichessGameCta.js"],
-      "run_at": "document_idle"
-    }
-  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self'"
   },
