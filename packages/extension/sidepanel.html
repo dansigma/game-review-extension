@@ -162,7 +162,8 @@
       .review-summary p {
         margin: 0;
       }
-      .review-summary .accuracy {
+      .review-summary .accuracy,
+      .review-summary .judgements {
         color: var(--accent);
         font-weight: 600;
       }
@@ -384,9 +385,9 @@
         <h2>Revisão</h2>
         <label for="engine-quality-preset">Qualidade do motor</label>
         <select id="engine-quality-preset" aria-label="Qualidade do motor">
-          <option value="fast">Rápido</option>
-          <option value="standard" selected>Padrão (80k)</option>
-          <option value="deep">Profundo</option>
+          <option value="fast">Rápido (80k)</option>
+          <option value="standard" selected>Padrão (400k)</option>
+          <option value="deep">Profundo (1,5M)</option>
         </select>
         <button id="analyze-game" type="button" class="primary">Analisar partida</button>
         <button id="reanalyze-game" type="button" hidden>Reanalisar</button>
@@ -401,6 +402,7 @@
           <div class="review-summary">
             <p id="review-summary-result"></p>
             <p id="review-summary-accuracy" class="accuracy"></p>
+            <p id="review-summary-judgements" class="judgements"></p>
           </div>
           <div id="board-host" aria-label="Tabuleiro"></div>
           <canvas id="eval-graph" aria-label="Gráfico de avaliação"></canvas>
@@ -431,7 +433,7 @@
         <summary>PoCs de desenvolvimento (SIG-652)</summary>
         <section>
           <h1>PoC 1 — sf_18</h1>
-          <p>UCI, MultiPV=2, Threads=1, posição Kiwipete, <code>go nodes 20000</code>.</p>
+          <p>UCI, MultiPV=2, Threads=2, posição Kiwipete, <code>go nodes 20000</code>.</p>
           <div class="row">
             <button id="poc1" type="button">Rodar PoC 1</button>
           </div>

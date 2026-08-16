@@ -1,10 +1,12 @@
 import {
   buildCommentSlice,
+  countJudgements,
   isOnlyMove,
   MOVE_CLASS_LABEL_PT,
   selectCriticalMoments,
   type CriticalMoment,
   type GameReview,
+  type JudgementsByColor,
   type MoveClass,
   type NormalizedGame,
   type PlayerColor,
@@ -14,6 +16,7 @@ import {
   DEFAULT_ENGINE_PRESET,
   isEngineQualityPresetId,
   nodesForPreset,
+  presetSelectLabel,
   type EngineQualityPresetId,
 } from "../budgetDecision.ts";
 import { formatAnalysisProgressLabel } from "../analysisEta.ts";
@@ -41,6 +44,7 @@ export interface GameReviewPanelElements {
   resultsBlock: HTMLElement;
   summaryResult: HTMLElement;
   summaryAccuracy: HTMLElement;
+  summaryJudgements: HTMLElement;
   boardHost: HTMLElement;
   evalCanvas: HTMLCanvasElement;
   moveList: HTMLElement;
@@ -126,6 +130,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     resultsBlock: requireEl("#review-results"),
     summaryResult: requireEl("#review-summary-result"),
     summaryAccuracy: requireEl("#review-summary-accuracy"),
+    summaryJudgements: requireEl("#review-summary-judgements"),
     boardHost: requireEl("#board-host"),
     evalCanvas,
     moveList: requireEl("#move-list"),
@@ -143,6 +148,22 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
   };
 }
 
+const PRESET_IDS: EngineQualityPresetId[] = ["fast", "standard", "deep"];
+
+function fillPresetSelect(select: HTMLSelectElement): void {
+  const selected = isEngineQualityPresetId(select.value)
+    ? select.value
+    : DEFAULT_ENGINE_PRESET;
+  select.replaceChildren();
+  for (const id of PRESET_IDS) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = presetSelectLabel(id);
+    option.selected = id === selected;
+    select.append(option);
+  }
+}
+
 export class GameReviewPanel {
   private game: NormalizedGame | null = null;
   private review: GameReview | null = null;
@@ -153,6 +174,7 @@ export class GameReviewPanel {
   private onPresetChange: (() => void) | null = null;
 
   constructor(private readonly el: GameReviewPanelElements) {
+    fillPresetSelect(el.presetSelect);
     el.analyzeButton.addEventListener("click", () => this.onAnalyze?.());
     el.reanalyzeButton.addEventListener("click", () => this.onReanalyze?.());
     el.cancelButton.addEventListener("click", () => this.onCancel?.());
@@ -269,6 +291,9 @@ export class GameReviewPanel {
     this.el.summaryAccuracy.textContent =
       `Precisão: Brancas ${this.review.white.accuracy.toFixed(1)}% · ` +
       `Pretas ${this.review.black.accuracy.toFixed(1)}%`;
+    this.el.summaryJudgements.textContent = formatJudgementSummary(
+      countJudgements(this.review.moves),
+    );
   }
 
   private renderCriticalMoments(): void {
@@ -533,6 +558,23 @@ function formatMoveRef(ply: number, color: PlayerColor, san: string): string {
 
 function colorLabelPt(color: PlayerColor): string {
   return color === "white" ? "Brancas" : "Pretas";
+}
+
+function formatJudgementLine(
+  color: PlayerColor,
+  counts: JudgementsByColor[PlayerColor],
+): string {
+  return (
+    `${colorLabelPt(color)}: ${counts.inaccuracy} imprecisões · ` +
+    `${counts.mistake} erros · ${counts.blunder} blunders`
+  );
+}
+
+function formatJudgementSummary(judgements: JudgementsByColor): string {
+  return [
+    formatJudgementLine("white", judgements.white),
+    formatJudgementLine("black", judgements.black),
+  ].join("\n");
 }
 
 function formatWinSwing(swing: number): string {

@@ -40,10 +40,14 @@ export type { CommentSlice } from "./commentSlice.ts";
 export { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
 export {
   CRITICAL_EPL_MIN,
-  CRITICAL_MAX_PER_COLOR,
+  countJudgements,
   selectCriticalMoments,
 } from "./criticalMoments.ts";
-export type { CriticalMoment } from "./criticalMoments.ts";
+export type {
+  CriticalMoment,
+  JudgementCounts,
+  JudgementsByColor,
+} from "./criticalMoments.ts";
 export {
   isOnlyMove,
   ONLY_MOVE_WIN_PERCENT_GAP,

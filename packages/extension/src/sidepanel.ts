@@ -677,7 +677,7 @@ document.querySelector("#poc3-80")?.addEventListener("click", () => {
 });
 
 log(
-  "Side Panel pronto. Engine no painel (fecha o painel, cancela). Threads=1; SharedArrayBuffer exigido pelo sf_18 (COOP/COEP).",
+  "Side Panel pronto. Engine no painel (fecha o painel, cancela). Threads=2; SharedArrayBuffer exigido pelo sf_18 (COOP/COEP).",
 );
 setStatus("Aguardando");
 void loadActiveGameFromSession();

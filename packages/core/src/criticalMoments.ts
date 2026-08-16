@@ -2,7 +2,12 @@ import type { MoveClass, PlayerColor, ReviewedMove } from "./types.ts";
 
 /** First Lichess glyph threshold (inaccuracy and worse). */
 export const CRITICAL_EPL_MIN = 0.05;
-export const CRITICAL_MAX_PER_COLOR = 3;
+
+const CRITICAL_CLASSIFICATIONS = new Set<MoveClass>([
+  "inaccuracy",
+  "mistake",
+  "blunder",
+]);
 
 export interface CriticalMoment {
   ply: number;
@@ -13,42 +18,56 @@ export interface CriticalMoment {
   classification: MoveClass;
 }
 
-function compareForSelection(a: ReviewedMove, b: ReviewedMove): number {
-  if (b.epl !== a.epl) {
-    return b.epl - a.epl;
-  }
-  return a.ply - b.ply;
+export interface JudgementCounts {
+  inaccuracy: number;
+  mistake: number;
+  blunder: number;
 }
 
-function selectTopPerColor(
-  moves: readonly ReviewedMove[],
-  color: PlayerColor,
-): CriticalMoment[] {
-  const eligible = moves
-    .filter(
-      (move) =>
-        move.color === color &&
-        move.classification !== "forced" &&
-        move.epl >= CRITICAL_EPL_MIN,
-    )
-    .sort(compareForSelection)
-    .slice(0, CRITICAL_MAX_PER_COLOR);
+export type JudgementsByColor = Record<PlayerColor, JudgementCounts>;
 
-  return eligible.map((move) => ({
-    ply: move.ply,
-    color: move.color,
-    san: move.san,
-    epl: move.epl,
-    winPercentSwing: move.playerWinPercentBefore - move.playerWinPercentAfter,
-    classification: move.classification,
-  }));
+const EMPTY_JUDGEMENTS: JudgementCounts = {
+  inaccuracy: 0,
+  mistake: 0,
+  blunder: 0,
+};
+
+function isCriticalClassification(
+  classification: MoveClass,
+): classification is "inaccuracy" | "mistake" | "blunder" {
+  return CRITICAL_CLASSIFICATIONS.has(classification);
+}
+
+export function countJudgements(
+  moves: readonly ReviewedMove[],
+): JudgementsByColor {
+  const counts: JudgementsByColor = {
+    white: { ...EMPTY_JUDGEMENTS },
+    black: { ...EMPTY_JUDGEMENTS },
+  };
+
+  for (const move of moves) {
+    if (!isCriticalClassification(move.classification)) {
+      continue;
+    }
+    counts[move.color][move.classification] += 1;
+  }
+
+  return counts;
 }
 
 export function selectCriticalMoments(
   moves: readonly ReviewedMove[],
 ): CriticalMoment[] {
-  return [
-    ...selectTopPerColor(moves, "white"),
-    ...selectTopPerColor(moves, "black"),
-  ].sort((a, b) => a.ply - b.ply);
+  return moves
+    .filter((move) => isCriticalClassification(move.classification))
+    .map((move) => ({
+      ply: move.ply,
+      color: move.color,
+      san: move.san,
+      epl: move.epl,
+      winPercentSwing: move.playerWinPercentBefore - move.playerWinPercentAfter,
+      classification: move.classification,
+    }))
+    .sort((a, b) => a.ply - b.ply);
 }
