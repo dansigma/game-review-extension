@@ -3,10 +3,10 @@ export const MVP_ENGINE_ID = "sf_18";
 export const MVP_NODES_PER_POSITION = 400_000;
 export const MVP_GO_COMMAND = `nodes ${MVP_NODES_PER_POSITION}`;
 export const MVP_MULTIPV = 2;
-export const MVP_THREADS = 1;
+export const MVP_THREADS = 2;
 
 /**
- * `go nodes` keeps wall-clock predictable in the Chrome Side Panel (Threads=1).
+ * `go nodes` keeps wall-clock predictable in the Chrome Side Panel (Threads=2).
  * Default 400k nodes uses sf_18 full NNUE; fast/deep presets trade speed vs strength.
  * Cache key includes nodesPerPosition.
  */

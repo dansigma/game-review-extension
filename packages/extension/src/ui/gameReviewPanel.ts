@@ -1,10 +1,12 @@
 import {
   buildCommentSlice,
+  countJudgements,
   isOnlyMove,
   MOVE_CLASS_LABEL_PT,
   selectCriticalMoments,
   type CriticalMoment,
   type GameReview,
+  type JudgementsByColor,
   type MoveClass,
   type NormalizedGame,
   type PlayerColor,
@@ -42,6 +44,7 @@ export interface GameReviewPanelElements {
   resultsBlock: HTMLElement;
   summaryResult: HTMLElement;
   summaryAccuracy: HTMLElement;
+  summaryJudgements: HTMLElement;
   boardHost: HTMLElement;
   evalCanvas: HTMLCanvasElement;
   moveList: HTMLElement;
@@ -127,6 +130,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     resultsBlock: requireEl("#review-results"),
     summaryResult: requireEl("#review-summary-result"),
     summaryAccuracy: requireEl("#review-summary-accuracy"),
+    summaryJudgements: requireEl("#review-summary-judgements"),
     boardHost: requireEl("#board-host"),
     evalCanvas,
     moveList: requireEl("#move-list"),
@@ -287,6 +291,9 @@ export class GameReviewPanel {
     this.el.summaryAccuracy.textContent =
       `Precisão: Brancas ${this.review.white.accuracy.toFixed(1)}% · ` +
       `Pretas ${this.review.black.accuracy.toFixed(1)}%`;
+    this.el.summaryJudgements.textContent = formatJudgementSummary(
+      countJudgements(this.review.moves),
+    );
   }
 
   private renderCriticalMoments(): void {
@@ -551,6 +558,23 @@ function formatMoveRef(ply: number, color: PlayerColor, san: string): string {
 
 function colorLabelPt(color: PlayerColor): string {
   return color === "white" ? "Brancas" : "Pretas";
+}
+
+function formatJudgementLine(
+  color: PlayerColor,
+  counts: JudgementsByColor[PlayerColor],
+): string {
+  return (
+    `${colorLabelPt(color)}: ${counts.inaccuracy} imprecisões · ` +
+    `${counts.mistake} erros · ${counts.blunder} blunders`
+  );
+}
+
+function formatJudgementSummary(judgements: JudgementsByColor): string {
+  return [
+    formatJudgementLine("white", judgements.white),
+    formatJudgementLine("black", judgements.black),
+  ].join("\n");
 }
 
 function formatWinSwing(swing: number): string {

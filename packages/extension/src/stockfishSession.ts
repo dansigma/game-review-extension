@@ -5,6 +5,7 @@ import {
   parseInfoLine,
   type UciInfo,
 } from "./uci.ts";
+import { MVP_THREADS } from "./budgetDecision.ts";
 import type { EngineCommand, EngineEvent } from "./engineWorker.ts";
 
 export interface AnalyzePositionArgs {
@@ -69,7 +70,8 @@ export class StockfishSession {
       return isUciOk(line);
     });
     this.sendUci("setoption name MultiPV value 2");
-    this.sendUci("setoption name Threads value 1");
+    // sf_18 pthread workers reuse sf_18.js via import.meta.url; no extra asset copy.
+    this.sendUci(`setoption name Threads value ${MVP_THREADS}`);
     this.sendUci("setoption name Hash value 64");
     await this.sendAndCollect("isready", isReadyOk);
     return lines;

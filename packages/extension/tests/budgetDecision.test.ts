@@ -4,6 +4,7 @@ import {
   ENGINE_QUALITY_PRESETS,
   formatNodesLabel,
   MVP_NODES_PER_POSITION,
+  MVP_THREADS,
   nodesForPreset,
   presetSelectLabel,
 } from "../src/budgetDecision.ts";
@@ -19,6 +20,7 @@ describe("engine quality presets", () => {
     expect(DEFAULT_ENGINE_PRESET).toBe("standard");
     expect(nodesForPreset(DEFAULT_ENGINE_PRESET)).toBe(MVP_NODES_PER_POSITION);
     expect(MVP_NODES_PER_POSITION).toBe(400_000);
+    expect(MVP_THREADS).toBe(2);
   });
 
   it("exposes Portuguese labels for the side panel", () => {
