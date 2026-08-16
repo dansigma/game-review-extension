@@ -39,8 +39,6 @@ const CLASS_CSS: Record<MoveClass, string> = {
   brilliant: "move-brilliant",
   great: "move-great",
   best: "move-best",
-  good: "move-good",
-  inaccuracy: "move-inaccuracy",
   mistake: "move-mistake",
   miss: "move-miss",
   blunder: "move-blunder",
@@ -744,7 +742,7 @@ export class GameReviewPanel {
 
   private renderJudgement(slice: CommentSlice): DocumentFragment {
     const frag = document.createDocumentFragment();
-    const { classification, bestSan, playedIsBest } = slice;
+    const { classification, bestSan } = slice;
     const bestIndex = bestSan !== undefined ? 0 : null;
 
     const appendText = (text: string): void => {
@@ -760,18 +758,6 @@ export class GameReviewPanel {
         break;
       case "best":
         appendText("Melhor lance.");
-        break;
-      case "good":
-        appendText("Bom lance.");
-        break;
-      case "inaccuracy":
-        if (bestSan && !playedIsBest) {
-          appendText("Imprecisão. Melhor era ");
-          frag.appendChild(this.createEngineSanButton(bestSan, bestIndex ?? 0));
-          appendText(".");
-        } else {
-          appendText("Imprecisão.");
-        }
         break;
       case "mistake":
         if (bestSan) {

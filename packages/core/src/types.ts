@@ -1,5 +1,5 @@
-/** Accuracy curve unchanged (Lichess lila); sacrifice/Brilliant rules bumped in v4. */
-export const ALGO_VERSION = "lila-v4" as const;
+/** Accuracy curve unchanged (Lichess lila); move-class ladder simplified in v5. */
+export const ALGO_VERSION = "lila-v5" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
@@ -11,8 +11,6 @@ export type MoveClass =
   | "brilliant"
   | "great"
   | "best"
-  | "good"
-  | "inaccuracy"
   | "mistake"
   | "miss"
   | "blunder"
@@ -22,8 +20,6 @@ export const MOVE_CLASS_LABEL_PT: Record<MoveClass, string> = {
   brilliant: "Brilliant",
   great: "Great",
   best: "Best",
-  good: "Good",
-  inaccuracy: "Imprecisão",
   mistake: "Erro",
   miss: "Miss",
   blunder: "Blunder",
@@ -35,9 +31,12 @@ export const MOVE_CLASS_LABEL_PT: Record<MoveClass, string> = {
  * Own scale for this product — not Chess.com taxonomy.
  */
 export const EPL_THRESHOLDS = {
+  /** Brilliant/Great quality gate (playedIsBest or EPL below this). */
   best: 0.02,
-  good: 0.05,
-  inaccuracy: 0.1,
+  /** Upper EPL for Best class (non-forced ladder). */
+  bestBandMax: 0.05,
+  /** Previous opponent EPL required to qualify for Miss (not a move class). */
+  missPreviousOpponent: 0.1,
   mistake: 0.15,
 } as const;
 

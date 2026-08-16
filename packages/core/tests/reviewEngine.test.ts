@@ -32,7 +32,7 @@ function line(
 }
 
 describe("reviewGame on PGN fixtures", () => {
-  it("covers Best / Good / Imprecisão / Erro / Blunder from classification-coverage.pgn", () => {
+  it("covers Best / Erro / Blunder from classification-coverage.pgn", () => {
     const game = parsePgn(fixture("classification-coverage.pgn"));
     expect(game.moves.map((move) => move.uci)).toEqual([
       "e2e4",
@@ -79,16 +79,16 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.algoVersion).toBe(ALGO_VERSION);
     expect(review.moves.map((move) => move.classification)).toEqual([
       "best",
-      "good",
-      "inaccuracy",
+      "best",
+      "mistake",
       "mistake",
       "miss",
       "best",
     ]);
     expect(review.moves.map((move) => move.classificationLabel)).toEqual([
       "Best",
-      "Good",
-      "Imprecisão",
+      "Best",
+      "Erro",
       "Erro",
       "Miss",
       "Best",

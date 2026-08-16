@@ -4,8 +4,6 @@ const CLASSIFICATION_GLYPH: Record<MoveClass, string> = {
   brilliant: "!!",
   great: "!",
   best: "★",
-  good: "",
-  inaccuracy: "?!",
   mistake: "?",
   miss: "",
   blunder: "??",
@@ -30,7 +28,7 @@ export interface JudgementCommentArgs {
 }
 
 export function judgementComment(args: JudgementCommentArgs): string {
-  const { classification, bestSan, playedIsBest } = args;
+  const { classification, bestSan } = args;
 
   switch (classification) {
     case "brilliant":
@@ -39,13 +37,6 @@ export function judgementComment(args: JudgementCommentArgs): string {
       return "Ótimo lance.";
     case "best":
       return "Melhor lance.";
-    case "good":
-      return "Bom lance.";
-    case "inaccuracy":
-      if (bestSan && !playedIsBest) {
-        return `Imprecisão. Melhor era ${bestSan}.`;
-      }
-      return "Imprecisão.";
     case "mistake":
       return bestSan ? `Erro. Melhor era ${bestSan}.` : "Erro.";
     case "miss":

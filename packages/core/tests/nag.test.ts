@@ -10,8 +10,6 @@ const ALL_CLASSES: MoveClass[] = [
   "brilliant",
   "great",
   "best",
-  "good",
-  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
@@ -23,8 +21,6 @@ describe("classificationGlyph", () => {
     expect(classificationGlyph("brilliant")).toBe("!!");
     expect(classificationGlyph("great")).toBe("!");
     expect(classificationGlyph("best")).toBe("★");
-    expect(classificationGlyph("good")).toBe("");
-    expect(classificationGlyph("inaccuracy")).toBe("?!");
     expect(classificationGlyph("mistake")).toBe("?");
     expect(classificationGlyph("miss")).toBe("");
     expect(classificationGlyph("blunder")).toBe("??");
@@ -46,21 +42,21 @@ describe("classificationGlyph", () => {
 
 describe("formatSanWithGlyph", () => {
   it("appends the glyph after SAN", () => {
-    expect(formatSanWithGlyph("Be2", "inaccuracy")).toBe("Be2?!");
+    expect(formatSanWithGlyph("Be2", "mistake")).toBe("Be2?");
     expect(formatSanWithGlyph("Nf3", "great")).toBe("Nf3!");
     expect(formatSanWithGlyph("Qxf7#", "best")).toBe("Qxf7#★");
     expect(formatSanWithGlyph("Qg5", "brilliant")).toBe("Qg5!!");
   });
 
-  it("leaves good and forced moves without a glyph suffix", () => {
-    expect(formatSanWithGlyph("d4", "good")).toBe("d4");
+  it("leaves best, miss and forced moves without a glyph suffix when empty", () => {
+    expect(formatSanWithGlyph("d4", "best")).toBe("d4★");
     expect(formatSanWithGlyph("Kf1", "forced")).toBe("Kf1");
     expect(formatSanWithGlyph("Qh5", "miss")).toBe("Qh5");
   });
 });
 
 describe("judgementComment", () => {
-  it("returns fixed sentences for brilliant, great, best and good", () => {
+  it("returns fixed sentences for brilliant, great and best", () => {
     expect(
       judgementComment({ classification: "brilliant", playedIsBest: true }),
     ).toBe("Lance brilhante.");
@@ -70,38 +66,9 @@ describe("judgementComment", () => {
     expect(
       judgementComment({ classification: "best", playedIsBest: true }),
     ).toBe("Melhor lance.");
-    expect(
-      judgementComment({ classification: "good", playedIsBest: false }),
-    ).toBe("Bom lance.");
-  });
-
-  it("includes bestSan for inaccuracy when not playedIsBest", () => {
-    expect(
-      judgementComment({
-        classification: "inaccuracy",
-        bestSan: "Ne7",
-        playedIsBest: false,
-      }),
-    ).toBe("Imprecisão. Melhor era Ne7.");
-  });
-
-  it("omits bestSan for inaccuracy when playedIsBest", () => {
-    expect(
-      judgementComment({
-        classification: "inaccuracy",
-        bestSan: "Ne7",
-        playedIsBest: true,
-      }),
-    ).toBe("Imprecisão.");
   });
 
   it("falls back when bestSan is missing", () => {
-    expect(
-      judgementComment({
-        classification: "inaccuracy",
-        playedIsBest: false,
-      }),
-    ).toBe("Imprecisão.");
     expect(
       judgementComment({ classification: "mistake", playedIsBest: false }),
     ).toBe("Erro.");
