@@ -113,7 +113,7 @@ describe("selectCriticalMoments", () => {
 });
 
 describe("countJudgements", () => {
-  it("counts inaccuracy, mistake and blunder per color", () => {
+  it("counts best, good, inaccuracy, mistake and blunder per color", () => {
     const moves = [
       fakeMove({ ply: 0, color: "white", epl: 0.1, classification: "inaccuracy" }),
       fakeMove({ ply: 2, color: "white", epl: 0.12, classification: "inaccuracy" }),
@@ -124,10 +124,11 @@ describe("countJudgements", () => {
       fakeMove({ ply: 6, color: "black", epl: 0.35, classification: "blunder" }),
       fakeMove({ ply: 7, color: "white", epl: 0.01, classification: "best" }),
       fakeMove({ ply: 8, color: "black", epl: 0.5, classification: "forced" }),
+      fakeMove({ ply: 9, color: "black", epl: 0.03, classification: "good" }),
     ];
     expect(countJudgements(moves)).toEqual({
-      white: { inaccuracy: 2, mistake: 0, blunder: 1 },
-      black: { inaccuracy: 1, mistake: 1, blunder: 2 },
+      white: { best: 1, good: 0, inaccuracy: 2, mistake: 0, blunder: 1 },
+      black: { best: 0, good: 1, inaccuracy: 1, mistake: 1, blunder: 2 },
     });
   });
 });

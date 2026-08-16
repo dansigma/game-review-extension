@@ -2,6 +2,7 @@ import {
   buildCommentSlice,
   classificationGlyph,
   countJudgements,
+  DASHBOARD_CLASSES,
   formatSanWithGlyph,
   formatMoveEvalAfter,
   isOnlyMove,
@@ -10,6 +11,7 @@ import {
   selectCriticalMoments,
   type CriticalMoment,
   type GameReview,
+  type JudgementCounts,
   type JudgementsByColor,
   type MoveClass,
   type NormalizedGame,
@@ -172,6 +174,8 @@ export class GameReviewPanel {
   private game: NormalizedGame | null = null;
   private review: GameReview | null = null;
   private currentPly = -1;
+  private classPlies = new Map<string, number[]>();
+  private judgementCycleIndex = new Map<string, number>();
   private onAnalyze: (() => void) | null = null;
   private onReanalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
@@ -260,6 +264,8 @@ export class GameReviewPanel {
     this.review = review;
     this.game = game;
     this.currentPly = -1;
+    this.judgementCycleIndex.clear();
+    this.classPlies = buildClassPlies(review.moves);
     this.el.presetSelect.disabled = false;
     this.el.progressBlock.hidden = true;
     this.el.analyzeButton.hidden = true;
@@ -295,9 +301,88 @@ export class GameReviewPanel {
     this.el.summaryAccuracy.textContent =
       `Precisão: Brancas ${this.review.white.accuracy.toFixed(1)}% · ` +
       `Pretas ${this.review.black.accuracy.toFixed(1)}%`;
-    this.el.summaryJudgements.textContent = formatJudgementSummary(
-      countJudgements(this.review.moves),
+    this.renderClassDashboard(countJudgements(this.review.moves));
+  }
+
+  private renderClassDashboard(judgements: JudgementsByColor): void {
+    const container = this.el.summaryJudgements;
+    container.replaceChildren();
+    container.className = "judgements class-dashboard";
+
+    const frag = document.createDocumentFragment();
+    for (const classification of DASHBOARD_CLASSES) {
+      frag.appendChild(this.classDashboardRow(classification, judgements));
+    }
+    container.appendChild(frag);
+  }
+
+  private classDashboardRow(
+    classification: keyof JudgementCounts,
+    judgements: JudgementsByColor,
+  ): HTMLElement {
+    const row = document.createElement("div");
+    row.className = `class-dashboard-row ${CLASS_CSS[classification]}`;
+
+    const whiteCount = judgements.white[classification];
+    const blackCount = judgements.black[classification];
+
+    row.append(
+      this.classCountButton("white", classification, whiteCount),
+      this.classDashboardGlyph(classification),
+      this.classDashboardLabel(classification),
+      this.classCountButton("black", classification, blackCount),
     );
+    return row;
+  }
+
+  private classDashboardGlyph(classification: keyof JudgementCounts): HTMLElement {
+    const glyph = document.createElement("span");
+    glyph.className = "class-dashboard-glyph";
+    glyph.textContent = classificationGlyph(classification);
+    return glyph;
+  }
+
+  private classDashboardLabel(classification: keyof JudgementCounts): HTMLElement {
+    const label = document.createElement("span");
+    label.className = "class-dashboard-label";
+    label.textContent = MOVE_CLASS_LABEL_PT[classification];
+    return label;
+  }
+
+  private classCountButton(
+    color: PlayerColor,
+    classification: keyof JudgementCounts,
+    count: number,
+  ): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `class-dashboard-count ${CLASS_CSS[classification]}`;
+    btn.textContent = String(count);
+    btn.disabled = count === 0;
+    btn.setAttribute(
+      "aria-label",
+      `${colorLabelPt(color)}: ${count} ${MOVE_CLASS_LABEL_PT[classification]}`,
+    );
+    btn.addEventListener("click", () => this.onClassCountClick(color, classification));
+    return btn;
+  }
+
+  private onClassCountClick(
+    color: PlayerColor,
+    classification: keyof JudgementCounts,
+  ): void {
+    const key = classPliesKey(color, classification);
+    const plies = this.classPlies.get(key) ?? [];
+    if (plies.length === 0) {
+      return;
+    }
+    const index = this.judgementCycleIndex.get(key) ?? 0;
+    const ply = plies[index];
+    if (ply === undefined) {
+      return;
+    }
+    this.goToPly(ply);
+    this.judgementCycleIndex.set(key, (index + 1) % plies.length);
   }
 
   private renderCriticalMoments(): void {
@@ -583,21 +668,26 @@ function colorLabelPt(color: PlayerColor): string {
   return color === "white" ? "Brancas" : "Pretas";
 }
 
-function formatJudgementLine(
+function classPliesKey(
   color: PlayerColor,
-  counts: JudgementsByColor[PlayerColor],
+  classification: keyof JudgementCounts,
 ): string {
-  return (
-    `${colorLabelPt(color)}: ${counts.inaccuracy} imprecisões · ` +
-    `${counts.mistake} erros · ${counts.blunder} blunders`
-  );
+  return `${color}:${classification}`;
 }
 
-function formatJudgementSummary(judgements: JudgementsByColor): string {
-  return [
-    formatJudgementLine("white", judgements.white),
-    formatJudgementLine("black", judgements.black),
-  ].join("\n");
+function buildClassPlies(moves: readonly ReviewedMove[]): Map<string, number[]> {
+  const plies = new Map<string, number[]>();
+  for (const move of moves) {
+    if (move.classification === "forced") {
+      continue;
+    }
+    const classification = move.classification;
+    const key = classPliesKey(move.color, classification);
+    const list = plies.get(key) ?? [];
+    list.push(move.ply);
+    plies.set(key, list);
+  }
+  return plies;
 }
 
 function formatResult(result: string): string {
