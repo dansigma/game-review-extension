@@ -305,6 +305,49 @@
       .critical-moment-btn.move-best .critical-moment-class {
         color: var(--move-best);
       }
+      .comment-slice {
+        display: grid;
+        gap: 6px;
+      }
+      .comment-slice h3 {
+        font-size: 13px;
+        margin: 0;
+        color: var(--text);
+      }
+      #comment-slice-empty {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+      }
+      #comment-slice-body {
+        display: grid;
+        gap: 4px;
+        font-size: 12px;
+        padding: 6px 8px;
+        border: 1px solid #333;
+        border-radius: 6px;
+        background: #1a1917;
+      }
+      .comment-slice-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .comment-slice-san {
+        font-weight: 600;
+        font-family: ui-monospace, monospace;
+      }
+      .comment-slice-muted {
+        color: var(--muted);
+      }
+      #comment-slice-button {
+        justify-self: start;
+        font-size: 12px;
+      }
+      #comment-slice-button:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
     </style>
   </head>
   <body>
@@ -371,6 +414,12 @@
           <div id="critical-moments" class="critical-moments">
             <h3>Momentos críticos</h3>
             <div id="critical-moments-list"></div>
+          </div>
+          <div id="comment-slice" class="comment-slice">
+            <h3>Comentário</h3>
+            <p id="comment-slice-empty">Selecione um lance</p>
+            <div id="comment-slice-body" hidden></div>
+            <button id="comment-slice-button" type="button" disabled>Login necessário para comentar</button>
           </div>
           <div class="move-list-wrap">
             <table id="move-list" aria-label="Lista de lances"></table>
