@@ -1,4 +1,5 @@
-export const ALGO_VERSION = "lila-v1" as const;
+/** Accuracy curve unchanged (Lichess lila); classification expanded in v2. */
+export const ALGO_VERSION = "lila-v2" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
@@ -7,18 +8,24 @@ export type PlayerColor = "white" | "black";
 export type GameResult = "1-0" | "0-1" | "1/2-1/2" | "*";
 
 export type MoveClass =
+  | "brilliant"
+  | "great"
   | "best"
   | "good"
   | "inaccuracy"
   | "mistake"
+  | "miss"
   | "blunder"
   | "forced";
 
 export const MOVE_CLASS_LABEL_PT: Record<MoveClass, string> = {
+  brilliant: "Brilliant",
+  great: "Great",
   best: "Best",
   good: "Good",
   inaccuracy: "Imprecisão",
   mistake: "Erro",
+  miss: "Miss",
   blunder: "Blunder",
   forced: "Forced",
 };

@@ -1,6 +1,8 @@
 import { Chess } from "chess.js";
 import { gameAccuracy, moveAccuracyFromWinPercents } from "./accuracy.ts";
 import { classificationLabel, classifyMove } from "./classify.ts";
+import { ONLY_MOVE_WIN_PERCENT_GAP } from "./onlyMove.ts";
+import { isSacrifice } from "./sacrifice.ts";
 import {
   ALGO_VERSION,
   type EngineLine,
@@ -139,10 +141,24 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
     const afterBest = bestLine(after);
     const playerWinAfter = 100 - playerWinPercent(afterBest.score);
     const epl = expectedPointsLost(playerWinBefore, playerWinAfter);
+    const alternativePlayerWinPercent = pv2
+      ? playerWinPercent(pv2.score)
+      : undefined;
+    const isOnlyMove =
+      alternativePlayerWinPercent !== undefined &&
+      playerWinBefore - alternativePlayerWinPercent >=
+        ONLY_MOVE_WIN_PERCENT_GAP;
+    const previous = reviewed[i - 1];
+    const previousOpponentEpl =
+      previous && previous.color !== move.color ? previous.epl : undefined;
     const classification = classifyMove({
       epl,
       playedIsBest,
       playerWinPercentBefore: playerWinBefore,
+      playerWinPercentAfter: playerWinAfter,
+      isOnlyMove,
+      isSacrifice: isSacrifice(move.fenBefore, move.uci),
+      previousOpponentEpl,
     });
     const accuracy = moveAccuracyFromWinPercents(
       playerWinBefore,
@@ -172,9 +188,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       ...(bestLineSan !== undefined ? { bestLineSan } : {}),
       playedIsBest,
       alternativeUci: pv2?.pv[0],
-      alternativePlayerWinPercent: pv2
-        ? playerWinPercent(pv2.score)
-        : undefined,
+      alternativePlayerWinPercent,
     });
 
     graph.push({

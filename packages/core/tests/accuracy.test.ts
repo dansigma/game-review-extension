@@ -9,6 +9,20 @@ import {
 } from "../src/accuracy.ts";
 import { classifyMove } from "../src/classify.ts";
 import { HOPELESS_WIN_PERCENT } from "../src/types.ts";
+
+function ladderArgs(
+  overrides: Partial<Parameters<typeof classifyMove>[0]>,
+): Parameters<typeof classifyMove>[0] {
+  return {
+    epl: 0,
+    playedIsBest: true,
+    playerWinPercentBefore: 50,
+    playerWinPercentAfter: 50,
+    isOnlyMove: false,
+    isSacrifice: false,
+    ...overrides,
+  };
+}
 import {
   expectedPointsLost,
   mateToCentipawns,
@@ -77,52 +91,64 @@ describe("lila-v1 game accuracy", () => {
 describe("classification thresholds", () => {
   it("maps EPL to Best / Good / Imprecisão / Erro / Blunder", () => {
     expect(
-      classifyMove({ epl: 0, playedIsBest: true, playerWinPercentBefore: 50 }),
+      classifyMove(ladderArgs({ epl: 0, playedIsBest: true })),
     ).toBe("best");
     expect(
-      classifyMove({
-        epl: 0.03,
-        playedIsBest: false,
-        playerWinPercentBefore: 50,
-      }),
+      classifyMove(
+        ladderArgs({
+          epl: 0.03,
+          playedIsBest: false,
+          playerWinPercentAfter: 47,
+        }),
+      ),
     ).toBe("good");
     expect(
-      classifyMove({
-        epl: 0.08,
-        playedIsBest: false,
-        playerWinPercentBefore: 50,
-      }),
+      classifyMove(
+        ladderArgs({
+          epl: 0.08,
+          playedIsBest: false,
+          playerWinPercentAfter: 42,
+        }),
+      ),
     ).toBe("inaccuracy");
     expect(
-      classifyMove({
-        epl: 0.12,
-        playedIsBest: false,
-        playerWinPercentBefore: 50,
-      }),
+      classifyMove(
+        ladderArgs({
+          epl: 0.12,
+          playedIsBest: false,
+          playerWinPercentAfter: 38,
+        }),
+      ),
     ).toBe("mistake");
     expect(
-      classifyMove({
-        epl: 0.2,
-        playedIsBest: false,
-        playerWinPercentBefore: 50,
-      }),
+      classifyMove(
+        ladderArgs({
+          epl: 0.2,
+          playedIsBest: false,
+          playerWinPercentAfter: 30,
+        }),
+      ),
     ).toBe("blunder");
   });
 
   it("marks hopeless positions Forced even if the move matches PV1", () => {
     expect(
-      classifyMove({
-        epl: 0,
-        playedIsBest: true,
-        playerWinPercentBefore: HOPELESS_WIN_PERCENT,
-      }),
+      classifyMove(
+        ladderArgs({
+          epl: 0,
+          playedIsBest: true,
+          playerWinPercentBefore: HOPELESS_WIN_PERCENT,
+        }),
+      ),
     ).toBe("forced");
     expect(
-      classifyMove({
-        epl: 0.4,
-        playedIsBest: false,
-        playerWinPercentBefore: 5,
-      }),
+      classifyMove(
+        ladderArgs({
+          epl: 0.4,
+          playedIsBest: false,
+          playerWinPercentBefore: 5,
+        }),
+      ),
     ).toBe("forced");
   });
 

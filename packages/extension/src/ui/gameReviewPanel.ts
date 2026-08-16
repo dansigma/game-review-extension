@@ -36,10 +36,13 @@ import {
 } from "./moveListRows.ts";
 
 const CLASS_CSS: Record<MoveClass, string> = {
+  brilliant: "move-brilliant",
+  great: "move-great",
   best: "move-best",
   good: "move-good",
   inaccuracy: "move-inaccuracy",
   mistake: "move-mistake",
+  miss: "move-miss",
   blunder: "move-blunder",
   forced: "move-forced",
 };
@@ -749,6 +752,12 @@ export class GameReviewPanel {
     };
 
     switch (classification) {
+      case "brilliant":
+        appendText("Lance brilhante.");
+        break;
+      case "great":
+        appendText("Ótimo lance.");
+        break;
       case "best":
         appendText("Melhor lance.");
         break;
@@ -771,6 +780,15 @@ export class GameReviewPanel {
           appendText(".");
         } else {
           appendText("Erro.");
+        }
+        break;
+      case "miss":
+        if (bestSan) {
+          appendText("Miss. Melhor era ");
+          frag.appendChild(this.createEngineSanButton(bestSan, bestIndex ?? 0));
+          appendText(".");
+        } else {
+          appendText("Miss.");
         }
         break;
       case "blunder":

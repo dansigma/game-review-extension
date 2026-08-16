@@ -10,23 +10,30 @@ export const CRITICAL_EPL_MIN = 0.05;
 const CRITICAL_CLASSIFICATIONS = new Set<MoveClass>([
   "inaccuracy",
   "mistake",
+  "miss",
   "blunder",
 ]);
 
 const DASHBOARD_CLASSIFICATIONS = new Set<MoveClass>([
+  "brilliant",
+  "great",
   "best",
   "good",
   "inaccuracy",
   "mistake",
+  "miss",
   "blunder",
 ]);
 
 /** Dashboard row order: positive → negative. Forced is excluded. */
 export const DASHBOARD_CLASSES: (keyof JudgementCounts)[] = [
+  "brilliant",
+  "great",
   "best",
   "good",
   "inaccuracy",
   "mistake",
+  "miss",
   "blunder",
 ];
 
@@ -42,26 +49,32 @@ export interface CriticalMoment {
 }
 
 export interface JudgementCounts {
+  brilliant: number;
+  great: number;
   best: number;
   good: number;
   inaccuracy: number;
   mistake: number;
+  miss: number;
   blunder: number;
 }
 
 export type JudgementsByColor = Record<PlayerColor, JudgementCounts>;
 
 const EMPTY_JUDGEMENTS: JudgementCounts = {
+  brilliant: 0,
+  great: 0,
   best: 0,
   good: 0,
   inaccuracy: 0,
   mistake: 0,
+  miss: 0,
   blunder: 0,
 };
 
 function isCriticalClassification(
   classification: MoveClass,
-): classification is "inaccuracy" | "mistake" | "blunder" {
+): classification is "inaccuracy" | "mistake" | "miss" | "blunder" {
   return CRITICAL_CLASSIFICATIONS.has(classification);
 }
 

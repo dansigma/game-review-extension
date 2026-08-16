@@ -7,28 +7,39 @@ import {
 import type { MoveClass } from "../src/types.ts";
 
 const ALL_CLASSES: MoveClass[] = [
+  "brilliant",
+  "great",
   "best",
   "good",
   "inaccuracy",
   "mistake",
+  "miss",
   "blunder",
   "forced",
 ];
 
 describe("classificationGlyph", () => {
   it("maps all move classes to NAG glyphs", () => {
+    expect(classificationGlyph("brilliant")).toBe("!!");
+    expect(classificationGlyph("great")).toBe("!");
     expect(classificationGlyph("best")).toBe("★");
-    expect(classificationGlyph("good")).toBe("!");
+    expect(classificationGlyph("good")).toBe("");
     expect(classificationGlyph("inaccuracy")).toBe("?!");
     expect(classificationGlyph("mistake")).toBe("?");
+    expect(classificationGlyph("miss")).toBe("");
     expect(classificationGlyph("blunder")).toBe("??");
     expect(classificationGlyph("forced")).toBe("");
   });
 
-  it("never uses !! as a glyph", () => {
+  it("uses !! only for Brilliant", () => {
     for (const moveClass of ALL_CLASSES) {
-      expect(classificationGlyph(moveClass)).not.toBe("!!");
-      expect(typeof classificationGlyph(moveClass)).toBe("string");
+      const glyph = classificationGlyph(moveClass);
+      if (moveClass === "brilliant") {
+        expect(glyph).toBe("!!");
+      } else {
+        expect(glyph).not.toBe("!!");
+      }
+      expect(typeof glyph).toBe("string");
     }
   });
 });
@@ -36,17 +47,26 @@ describe("classificationGlyph", () => {
 describe("formatSanWithGlyph", () => {
   it("appends the glyph after SAN", () => {
     expect(formatSanWithGlyph("Be2", "inaccuracy")).toBe("Be2?!");
-    expect(formatSanWithGlyph("Nf3", "good")).toBe("Nf3!");
+    expect(formatSanWithGlyph("Nf3", "great")).toBe("Nf3!");
     expect(formatSanWithGlyph("Qxf7#", "best")).toBe("Qxf7#★");
+    expect(formatSanWithGlyph("Qg5", "brilliant")).toBe("Qg5!!");
   });
 
-  it("leaves forced moves without a glyph suffix", () => {
+  it("leaves good and forced moves without a glyph suffix", () => {
+    expect(formatSanWithGlyph("d4", "good")).toBe("d4");
     expect(formatSanWithGlyph("Kf1", "forced")).toBe("Kf1");
+    expect(formatSanWithGlyph("Qh5", "miss")).toBe("Qh5");
   });
 });
 
 describe("judgementComment", () => {
-  it("returns fixed sentences for best and good", () => {
+  it("returns fixed sentences for brilliant, great, best and good", () => {
+    expect(
+      judgementComment({ classification: "brilliant", playedIsBest: true }),
+    ).toBe("Lance brilhante.");
+    expect(
+      judgementComment({ classification: "great", playedIsBest: true }),
+    ).toBe("Ótimo lance.");
     expect(
       judgementComment({ classification: "best", playedIsBest: true }),
     ).toBe("Melhor lance.");
@@ -86,11 +106,14 @@ describe("judgementComment", () => {
       judgementComment({ classification: "mistake", playedIsBest: false }),
     ).toBe("Erro.");
     expect(
+      judgementComment({ classification: "miss", playedIsBest: false }),
+    ).toBe("Miss.");
+    expect(
       judgementComment({ classification: "blunder", playedIsBest: false }),
     ).toBe("Blunder.");
   });
 
-  it("includes bestSan for mistake and blunder", () => {
+  it("includes bestSan for mistake, miss and blunder", () => {
     expect(
       judgementComment({
         classification: "mistake",
@@ -98,6 +121,13 @@ describe("judgementComment", () => {
         playedIsBest: false,
       }),
     ).toBe("Erro. Melhor era d4.");
+    expect(
+      judgementComment({
+        classification: "miss",
+        bestSan: "Nf3",
+        playedIsBest: false,
+      }),
+    ).toBe("Miss. Melhor era Nf3.");
     expect(
       judgementComment({
         classification: "blunder",
