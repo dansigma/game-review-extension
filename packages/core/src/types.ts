@@ -1,4 +1,4 @@
-export const ALGO_VERSION = "epl-v1" as const;
+export const ALGO_VERSION = "lila-v1" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
@@ -31,10 +31,10 @@ export const EPL_THRESHOLDS = {
   best: 0.02,
   good: 0.05,
   inaccuracy: 0.1,
-  mistake: 0.2,
+  mistake: 0.15,
 } as const;
 
-/** Player win% at or below this is hopeless; the ply is Forced and skipped in accuracy. */
+/** Player win% at or below this is hopeless; the ply is Forced (accuracy still computed). */
 export const HOPELESS_WIN_PERCENT = 10;
 
 export interface NormalizedPlayer {
@@ -98,7 +98,7 @@ export interface ReviewedMove {
   classification: MoveClass;
   classificationLabel: string;
   epl: number;
-  accuracy: number | null;
+  accuracy: number;
   playerWinPercentBefore: number;
   playerWinPercentAfter: number;
   whiteWinPercentAfter: number;

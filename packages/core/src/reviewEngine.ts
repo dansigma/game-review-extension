@@ -1,4 +1,4 @@
-import { aggregateAccuracy, moveAccuracy } from "./accuracy.ts";
+import { gameAccuracy, moveAccuracyFromWinPercents } from "./accuracy.ts";
 import { classificationLabel, classifyMove } from "./classify.ts";
 import {
   ALGO_VERSION,
@@ -32,6 +32,10 @@ function sideToMoveFromFen(fen: string): PlayerColor {
   throw new ReviewEngineError(`Cannot read side to move from FEN: ${fen}`);
 }
 
+function startColorFromFen(fen: string): PlayerColor {
+  return sideToMoveFromFen(fen);
+}
+
 function bestLine(position: PositionEval): EngineLine {
   const sorted = [...position.lines].sort((a, b) => a.multipv - b.multipv);
   const line = sorted[0];
@@ -53,16 +57,18 @@ function normalizeUci(uci: string): string {
 function playerAccuracy(
   color: PlayerColor,
   moves: readonly ReviewedMove[],
+  gameAccuracyResult: ReturnType<typeof gameAccuracy>,
 ): PlayerAccuracy {
   const ofColor = moves.filter((move) => move.color === color);
-  const counted = ofColor
-    .filter((move) => move.accuracy !== null)
-    .map((move) => move.accuracy as number);
+  const forcedCount = ofColor.filter(
+    (move) => move.classification === "forced",
+  ).length;
   return {
     color,
-    movesCounted: counted.length,
-    movesExcludedForced: ofColor.length - counted.length,
-    accuracy: aggregateAccuracy(counted),
+    movesCounted: ofColor.length,
+    movesExcludedForced: forcedCount,
+    accuracy:
+      color === "white" ? gameAccuracyResult.white : gameAccuracyResult.black,
   };
 }
 
@@ -121,8 +127,10 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       playedIsBest,
       playerWinPercentBefore: playerWinBefore,
     });
-    const accuracy =
-      classification === "forced" ? null : moveAccuracy(epl);
+    const accuracy = moveAccuracyFromWinPercents(
+      playerWinBefore,
+      playerWinAfter,
+    );
 
     reviewed.push({
       ply: move.ply,
@@ -150,13 +158,17 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
     });
   }
 
+  const startColor = startColorFromFen(game.initialFen);
+  const allWhiteWinPercents = graph.map((point) => point.whiteWinPercent);
+  const accuracyByColor = gameAccuracy(allWhiteWinPercents, startColor);
+
   return {
     gameId: game.gameId,
     algoVersion: ALGO_VERSION,
     engineId,
     nodesPerPosition,
-    white: playerAccuracy("white", reviewed),
-    black: playerAccuracy("black", reviewed),
+    white: playerAccuracy("white", reviewed, accuracyByColor),
+    black: playerAccuracy("black", reviewed, accuracyByColor),
     moves: reviewed,
     graph,
   };

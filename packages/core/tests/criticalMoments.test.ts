@@ -26,9 +26,9 @@ function fakeMove(
 }
 
 describe("selectCriticalMoments", () => {
-  it("never selects Forced/hopeless moves (accuracy === null)", () => {
+  it("never selects Forced/hopeless moves", () => {
     const moves = [
-      fakeMove({ ply: 0, color: "white", epl: 0.5, accuracy: null, classification: "forced" }),
+      fakeMove({ ply: 0, color: "white", epl: 0.5, classification: "forced" }),
       fakeMove({ ply: 1, color: "black", epl: 0.3, accuracy: 70 }),
     ];
     const result = selectCriticalMoments(moves);

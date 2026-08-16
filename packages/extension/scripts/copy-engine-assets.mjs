@@ -11,8 +11,11 @@ const require = createRequire(import.meta.url);
 const root = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = join(root, "..");
 const dest = join(pkgRoot, "public", "engine");
-const SMALLNET_NNUE = "nn-4ca89e4b3abf.nnue";
-const NNUE_URL = `https://tests.stockfishchess.org/api/nn/${SMALLNET_NNUE}`;
+const NNUE_FILES = [
+  "nn-c288c895ea92.nnue",
+  "nn-37f18f62d772.nnue",
+];
+const NNUE_BASE_URL = "https://tests.stockfishchess.org/api/nn";
 
 mkdirSync(dest, { recursive: true });
 
@@ -20,7 +23,7 @@ const pkgJson = require.resolve("@lichess-org/stockfish-web/package.json");
 const stockfishDir = dirname(pkgJson);
 
 const copied = [];
-for (const name of ["sf_18_smallnet.js", "sf_18_smallnet.wasm"]) {
+for (const name of ["sf_18.js", "sf_18.wasm"]) {
   const from = join(stockfishDir, name);
   const to = join(dest, name);
   if (!existsSync(from)) {
@@ -33,26 +36,28 @@ for (const name of ["sf_18_smallnet.js", "sf_18_smallnet.wasm"]) {
   copied.push(name);
 }
 
-const nnuePath = join(dest, SMALLNET_NNUE);
-if (!existsSync(nnuePath)) {
-  console.log(`Downloading ${SMALLNET_NNUE}…`);
-  const response = await fetch(NNUE_URL);
-  if (!response.ok || !response.body) {
-    console.error(`NNUE download failed: ${response.status} ${response.statusText}`);
-    process.exit(1);
+for (const nnue of NNUE_FILES) {
+  const nnuePath = join(dest, nnue);
+  if (!existsSync(nnuePath)) {
+    console.log(`Downloading ${nnue}…`);
+    const response = await fetch(`${NNUE_BASE_URL}/${nnue}`);
+    if (!response.ok || !response.body) {
+      console.error(`NNUE download failed for ${nnue}: ${response.status} ${response.statusText}`);
+      process.exit(1);
+    }
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(nnuePath));
   }
-  await pipeline(Readable.fromWeb(response.body), createWriteStream(nnuePath));
 }
 
 writeFileSync(
   join(dest, "README.txt"),
   [
-    "Stockfish 18 smallnet WASM + NNUE.",
+    "Stockfish 18 full NNUE WASM (sf_18).",
     "Source: @lichess-org/stockfish-web (AGPL-3.0-or-later). Stockfish itself is GPL-3.0.",
-    `NNUE: ${SMALLNET_NNUE}`,
+    `NNUE: ${NNUE_FILES.join(", ")}`,
     `Copied: ${copied.join(", ")}`,
   ].join("\n"),
   "utf8",
 );
 
-console.log(`Engine assets in ${dest}: ${copied.join(", ")}, ${SMALLNET_NNUE}`);
+console.log(`Engine assets in ${dest}: ${copied.join(", ")}, ${NNUE_FILES.join(", ")}`);

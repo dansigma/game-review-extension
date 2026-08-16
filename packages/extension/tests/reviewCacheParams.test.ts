@@ -7,8 +7,8 @@ describe("reviewCacheParams", () => {
   it("builds lookup params from game id and selected nodes", () => {
     const params = reviewCacheParams("abcd1234", nodesForPreset("standard"));
     expect(params.gameId).toBe("abcd1234");
-    expect(params.nodesPerPosition).toBe(80_000);
-    expect(params.engineId).toBe("sf_18_smallnet");
+    expect(params.nodesPerPosition).toBe(400_000);
+    expect(params.engineId).toBe("sf_18");
     expect(params.algoVersion.length).toBeGreaterThan(0);
   });
 
@@ -22,7 +22,7 @@ describe("reviewCacheParams", () => {
     );
 
     expect(fastKey).not.toBe(deepKey);
-    expect(fastKey).toContain("|20000");
-    expect(deepKey).toContain("|200000");
+    expect(fastKey).toContain("|80000");
+    expect(deepKey).toContain("|1500000");
   });
 });

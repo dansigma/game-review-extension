@@ -1,7 +1,7 @@
-import { EPL_THRESHOLDS, type PlayerColor, type ReviewedMove } from "./types.ts";
+import type { PlayerColor, ReviewedMove } from "./types.ts";
 
-/** Win% gap PV1−PV2 (same side to move); same floor as inaccuracy EPL (0.1). */
-export const ONLY_MOVE_WIN_PERCENT_GAP = EPL_THRESHOLDS.inaccuracy * 100;
+/** Win% gap PV1−PV2 (same side to move); 10-point floor independent of EPL classes. */
+export const ONLY_MOVE_WIN_PERCENT_GAP = 10;
 
 export interface OnlyMove {
   ply: number;
@@ -20,7 +20,7 @@ export function onlyMoveWinPercentGap(move: ReviewedMove): number | null {
 }
 
 export function isOnlyMove(move: ReviewedMove): boolean {
-  if (move.accuracy === null || move.classification === "forced") {
+  if (move.classification === "forced") {
     return false;
   }
   const gap = onlyMoveWinPercentGap(move);

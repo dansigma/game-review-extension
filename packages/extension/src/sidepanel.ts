@@ -348,7 +348,7 @@ async function withEngine<T>(fn: (engine: EnginePort) => Promise<T>): Promise<T>
 }
 
 async function runPoc1(): Promise<void> {
-  setStatus("PoC 1: loading sf_18_smallnet…");
+  setStatus("PoC 1: loading sf_18…");
   await withEngine(async (engine) => {
     const result = await engine.analyzePosition({
       fen: KIWIPETE_FEN,
@@ -677,7 +677,7 @@ document.querySelector("#poc3-80")?.addEventListener("click", () => {
 });
 
 log(
-  "Side Panel pronto. Engine no painel (fecha o painel, cancela). Threads=1; SharedArrayBuffer exigido pelo sf_18_smallnet (COOP/COEP).",
+  "Side Panel pronto. Engine no painel (fecha o painel, cancela). Threads=1; SharedArrayBuffer exigido pelo sf_18 (COOP/COEP).",
 );
 setStatus("Aguardando");
 void loadActiveGameFromSession();
