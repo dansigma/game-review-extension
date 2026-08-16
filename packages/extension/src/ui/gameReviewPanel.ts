@@ -550,11 +550,20 @@ export class GameReviewPanel {
         ? `${slice.evalBefore} → ${slice.evalAfter}`
         : slice.evalAfter;
 
+    const motorLine =
+      slice.engineLine !== undefined
+        ? `<div class="comment-slice-line comment-slice-secondary">` +
+          `<span class="comment-slice-muted">Motor</span>` +
+          `<span>${escapeHtml(slice.engineLine)}</span>` +
+          `</div>`
+        : "";
+
     commentSliceBody.innerHTML = [
       `<div class="comment-slice-header ${CLASS_CSS[slice.classification]}">` +
         `<span class="comment-slice-san">${escapeHtml(formatMoveRef(slice.ply, slice.color, sanWithGlyph))}</span>` +
         `</div>`,
       `<p class="comment-slice-judgement">${escapeHtml(judgement)}${escapeHtml(onlyMoveHint)}</p>`,
+      motorLine,
       `<div class="comment-slice-line comment-slice-secondary">` +
         `<span class="comment-slice-muted">Eval</span>` +
         `<span>${escapeHtml(evalLabel)}</span>` +

@@ -109,6 +109,8 @@ export interface ReviewedMove {
   bestUci: string;
   /** SAN for engine PV1 before the ply; omitted when UCI→SAN conversion fails. */
   bestSan?: string;
+  /** Up to 5 SAN plies of engine PV1 before the ply; omitted when conversion fails. */
+  bestLineSan?: string;
   playedIsBest: boolean;
   alternativeUci?: string;
   /** Side-to-move win% for MultiPV line 2 before the played move; absent when PV2 missing. */

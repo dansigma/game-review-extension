@@ -109,6 +109,45 @@ describe("buildCommentSlice", () => {
     expect(buildCommentSlice(review, 4)?.bestSan).toBe("d4");
   });
 
+  it("includes engineLine from bestLineSan when present", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 0,
+        color: "white",
+        san: "d4",
+        classification: "inaccuracy",
+        bestSan: "e4",
+        bestLineSan: "e4 e5 Nf3 Nc6 Bb5",
+        playedIsBest: false,
+      }),
+    ]);
+
+    expect(buildCommentSlice(review, 0)?.engineLine).toBe(
+      "e4 e5 Nf3 Nc6 Bb5",
+    );
+  });
+
+  it("omits engineLine when bestLineSan is absent", () => {
+    const review = stubReview([fakeMove({ ply: 0, color: "white" })]);
+    const slice = buildCommentSlice(review, 0);
+    expect(slice).not.toHaveProperty("engineLine");
+  });
+
+  it("engineLine is SAN-shaped, not UCI", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 0,
+        color: "white",
+        bestLineSan: "Ne7 Nf5 Bd3",
+      }),
+    ]);
+
+    const slice = buildCommentSlice(review, 0);
+    expect(slice?.engineLine).toBe("Ne7 Nf5 Bd3");
+    expect(slice?.engineLine).not.toMatch(/^[a-h][1-8][a-h][1-8]/);
+    expect(slice?.engineLine).not.toMatch(/\be2e4\b/);
+  });
+
   it("does not leak engine or UCI fields", () => {
     const review = stubReview([
       fakeMove({

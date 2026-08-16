@@ -23,6 +23,8 @@ export interface CommentSlice {
   playerWinPercentAfter: number;
   playedIsBest: boolean;
   bestSan?: string;
+  /** Space-separated SAN plies of engine PV1; never UCI. */
+  engineLine?: string;
   onlyMove: boolean;
   evalAfter: string;
   evalBefore?: string;
@@ -57,6 +59,7 @@ export function buildCommentSlice(
     playerWinPercentAfter: move.playerWinPercentAfter,
     playedIsBest: move.playedIsBest,
     bestSan: move.bestSan,
+    ...(move.bestLineSan !== undefined ? { engineLine: move.bestLineSan } : {}),
     onlyMove: isOnlyMove(move),
     evalAfter,
     evalBefore: evalBefore !== evalAfter ? evalBefore : undefined,

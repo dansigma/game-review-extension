@@ -5,6 +5,7 @@ import { ALGO_VERSION, type EngineLine, type PositionEval } from "../src/types.t
 import { parsePgn } from "../src/parsePgn.ts";
 import { isOnlyMove } from "../src/onlyMove.ts";
 import { reviewGame } from "../src/reviewEngine.ts";
+import { ENGINE_PV_SAN_MAX } from "../src/pvSan.ts";
 import { whiteScore } from "../src/evalDisplay.ts";
 import { playerWinPercent } from "../src/winPercent.ts";
 
@@ -25,9 +26,9 @@ function cpFromWinPercent(winPercent: number): number {
 function line(
   multipv: number,
   score: EngineLine["score"],
-  pv: string,
+  pv: string | string[],
 ): EngineLine {
-  return { multipv, depth: 16, score, pv: [pv] };
+  return { multipv, depth: 16, score, pv: Array.isArray(pv) ? pv : [pv] };
 }
 
 describe("reviewGame on PGN fixtures", () => {
@@ -358,5 +359,118 @@ describe("reviewGame on PGN fixtures", () => {
       whiteScore: { type: "cp", value: -220 },
     });
     expect(review.graph[1]?.whiteWinPercent).toBeGreaterThan(0);
+  });
+
+  it("persists bestLineSan from PV1 before the ply", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    expect(firstMove).toBeDefined();
+
+    const pv = ["e2e4", "e7e5", "g1f3", "b8c6", "f1b5"];
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: 50 }, pv),
+          line(2, { type: "cp", value: 30 }, "d2d4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: 220 }, "e7e5"),
+          line(2, { type: "cp", value: 100 }, "c7c5"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 1) },
+      evals,
+      engineId: "sf_18",
+    });
+
+    expect(review.moves[0]?.bestSan).toBe("e4");
+    expect(review.moves[0]?.bestLineSan).toBe("e4 e5 Nf3 Nc6 Bb5");
+  });
+
+  it(`caps bestLineSan at ${ENGINE_PV_SAN_MAX} SAN plies`, () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    expect(firstMove).toBeDefined();
+
+    const pv = [
+      "e2e4",
+      "e7e5",
+      "g1f3",
+      "b8c6",
+      "f1b5",
+      "a7a6",
+      "b5a4",
+    ];
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: 50 }, pv),
+          line(2, { type: "cp", value: 30 }, "d2d4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: 220 }, "e7e5"),
+          line(2, { type: "cp", value: 100 }, "c7c5"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 1) },
+      evals,
+      engineId: "sf_18",
+    });
+
+    expect(review.moves[0]?.bestLineSan?.split(" ")).toHaveLength(
+      ENGINE_PV_SAN_MAX,
+    );
+  });
+
+  it("stores only the SAN prefix when a later PV UCI fails to convert", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    expect(firstMove).toBeDefined();
+
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: 50 }, ["e2e4", "notauci", "g1f3"]),
+          line(2, { type: "cp", value: 30 }, "d2d4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: 220 }, "e7e5"),
+          line(2, { type: "cp", value: 100 }, "c7c5"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 1) },
+      evals,
+      engineId: "sf_18",
+    });
+
+    expect(review.moves[0]?.bestLineSan).toBe("e4");
+    expect(review.moves[0]?.bestLineSan).not.toMatch(/[a-h][1-8][a-h][1-8]/);
   });
 });
