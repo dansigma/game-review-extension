@@ -38,7 +38,12 @@ export type { GameAccuracyResult } from "./accuracy.ts";
 export { buildCommentSlice } from "./commentSlice.ts";
 export type { CommentSlice } from "./commentSlice.ts";
 export { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
-export { isSacrifice, PIECE_VALUE } from "./sacrifice.ts";
+export {
+  evalAfterCaptures,
+  isSacrifice,
+  PIECE_VALUE,
+  SACRIFICE_CP_DROP,
+} from "./sacrifice.ts";
 export {
   classificationGlyph,
   formatSanWithGlyph,

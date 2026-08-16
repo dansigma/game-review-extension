@@ -1,21 +1,121 @@
-import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
+import {
+  Chess,
+  SQUARES,
+  type Color,
+  type PieceSymbol,
+  type Square,
+} from "chess.js";
 
+/** Centipawn piece values for tactical material. */
 export const PIECE_VALUE: Record<PieceSymbol, number> = {
-  p: 1,
-  n: 3,
-  b: 3,
-  r: 5,
-  q: 9,
+  p: 100,
+  n: 300,
+  b: 300,
+  r: 500,
+  q: 900,
   k: 0,
 };
 
-function opponent(color: Color): Color {
-  return color === "w" ? "b" : "w";
+/** Real material loss after recaptures must exceed one pawn. */
+export const SACRIFICE_CP_DROP = 100;
+
+const MATE_SCORE = -10_000;
+const QSEARCH_MAX_DEPTH = 8;
+const QSEARCH_MAX_NODES = 64;
+
+function staticMaterial(fen: string, color: Color): number {
+  const chess = new Chess(fen);
+  let own = 0;
+  let opponentMaterial = 0;
+  for (const square of SQUARES) {
+    const piece = chess.get(square);
+    if (!piece) {
+      continue;
+    }
+    const value = PIECE_VALUE[piece.type];
+    if (piece.color === color) {
+      own += value;
+    } else {
+      opponentMaterial += value;
+    }
+  }
+  return own - opponentMaterial;
+}
+
+function captureMoves(chess: Chess) {
+  return chess
+    .moves({ verbose: true })
+    .filter((move) => move.captured !== undefined || move.flags.includes("e"));
+}
+
+function captureOrder(
+  a: ReturnType<typeof captureMoves>[number],
+  b: ReturnType<typeof captureMoves>[number],
+): number {
+  const victimA = a.captured ? PIECE_VALUE[a.captured] : PIECE_VALUE.p;
+  const victimB = b.captured ? PIECE_VALUE[b.captured] : PIECE_VALUE.p;
+  const aggressorA = PIECE_VALUE[a.piece];
+  const aggressorB = PIECE_VALUE[b.piece];
+  return victimB - victimA || aggressorA - aggressorB;
+}
+
+interface QSearchBudget {
+  nodes: number;
 }
 
 /**
- * Sacrifice: after the ply, the destination is attacked by the opponent and
- * moved-piece value minus captured value is at least 3 (pawn sacs excluded).
+ * Capture-only quiescence: best tactical outcome for side to move, in centipawns.
+ */
+export function evalAfterCaptures(fen: string): number {
+  const budget: QSearchBudget = { nodes: 0 };
+  return qsearch(fen, QSEARCH_MAX_DEPTH, budget);
+}
+
+function qsearch(fen: string, depth: number, budget: QSearchBudget): number {
+  if (budget.nodes >= QSEARCH_MAX_NODES) {
+    const chess = new Chess(fen);
+    return staticMaterial(fen, chess.turn());
+  }
+  budget.nodes += 1;
+
+  const chess = new Chess(fen);
+  const stm = chess.turn();
+
+  if (chess.isCheckmate()) {
+    return MATE_SCORE;
+  }
+  if (chess.isStalemate() || chess.isDraw()) {
+    return 0;
+  }
+
+  const standPat = staticMaterial(fen, stm);
+  if (depth <= 0) {
+    return standPat;
+  }
+
+  const captures = captureMoves(chess).sort(captureOrder);
+  if (captures.length === 0) {
+    return standPat;
+  }
+
+  let best = standPat;
+  for (const capture of captures) {
+    const next = new Chess(fen);
+    next.move(capture);
+    const score = -qsearch(next.fen(), depth - 1, budget);
+    if (score > best) {
+      best = score;
+      if (best >= MATE_SCORE / 2) {
+        break;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Sacrifice when static material before the move exceeds post-capture standing
+ * by more than {@link SACRIFICE_CP_DROP} (capture-only quiescence after the ply).
  */
 export function isSacrifice(fenBefore: string, uci: string): boolean {
   try {
@@ -29,15 +129,9 @@ export function isSacrifice(fenBefore: string, uci: string): boolean {
       return false;
     }
 
-    const movedPiece: PieceSymbol = move.promotion ?? move.piece;
-    const movedValue = PIECE_VALUE[movedPiece];
-    const capturedValue = move.captured ? PIECE_VALUE[move.captured] : 0;
-    const net = movedValue - capturedValue;
-    if (net < 3) {
-      return false;
-    }
-
-    return chess.isAttacked(to, opponent(mover));
+    const before = staticMaterial(fenBefore, mover);
+    const after = -evalAfterCaptures(chess.fen());
+    return before - after > SACRIFICE_CP_DROP;
   } catch {
     return false;
   }

@@ -193,7 +193,7 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.gameId).toBe("fixture1");
     expect(review.moves).toHaveLength(7);
     expect(review.moves[6]?.san).toBe("Qxf7#");
-    expect(review.moves[6]?.classification).toBe("brilliant");
+    expect(review.moves[6]?.classification).toBe("great");
   });
 
   it("rejects a wrong number of evals", () => {
