@@ -452,6 +452,19 @@
         border-radius: 6px;
         background: #1a1917;
       }
+      .comment-slice-header {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0;
+        margin: 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+      }
+      .comment-slice-header:hover .comment-slice-san {
+        text-decoration: underline;
+      }
       .comment-slice-header .comment-slice-san {
         font-weight: 600;
         font-family: ui-monospace, monospace;
@@ -490,6 +503,40 @@
       .comment-slice-secondary span:last-child {
         color: var(--text);
         opacity: 0.85;
+      }
+      .comment-slice-motor-value {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.15em 0.25em;
+        align-items: baseline;
+        justify-content: flex-end;
+        font-family: ui-monospace, monospace;
+        color: var(--text);
+        opacity: 0.85;
+      }
+      .comment-engine-num {
+        color: var(--muted);
+        font-family: ui-monospace, monospace;
+      }
+      .comment-engine-san {
+        font: inherit;
+        font-family: ui-monospace, monospace;
+        color: inherit;
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+        text-decoration: underline;
+        text-decoration-color: transparent;
+      }
+      .comment-engine-san:hover {
+        text-decoration-color: currentColor;
+      }
+      .comment-engine-san-active,
+      .comment-engine-san[aria-pressed="true"] {
+        color: var(--accent);
+        text-decoration-color: var(--accent);
       }
       .comment-slice-muted {
         color: var(--muted);

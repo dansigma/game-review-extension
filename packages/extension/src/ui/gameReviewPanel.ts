@@ -6,10 +6,11 @@ import {
   formatSanWithGlyph,
   formatMoveEvalAfter,
   isOnlyMove,
-  judgementComment,
   MOVE_CLASS_LABEL_PT,
   selectCriticalMoments,
+  tokenizeEngineLine,
   type CriticalMoment,
+  type CommentSlice,
   type GameReview,
   type JudgementCounts,
   type JudgementsByColor,
@@ -27,6 +28,7 @@ import {
 } from "../budgetDecision.ts";
 import { formatAnalysisProgressLabel } from "../analysisEta.ts";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
+import { previewEngineLineMove } from "./engineLinePreview.ts";
 import { renderEvalGraph } from "./evalGraph.ts";
 import {
   moveListRows,
@@ -199,6 +201,7 @@ export class GameReviewPanel {
   private classPlies = new Map<string, number[]>();
   private judgementCycleIndex = new Map<string, number>();
   private moveListFilter: MoveListFilter = null;
+  private enginePreviewIndex: number | null = null;
   private onAnalyze: (() => void) | null = null;
   private onReanalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
@@ -255,6 +258,7 @@ export class GameReviewPanel {
     this.game = game;
     this.review = null;
     this.currentPly = -1;
+    this.enginePreviewIndex = null;
     this.moveListFilter = null;
     if (!game) {
       this.el.reviewSection.hidden = true;
@@ -290,6 +294,7 @@ export class GameReviewPanel {
     this.review = review;
     this.game = game;
     this.currentPly = -1;
+    this.enginePreviewIndex = null;
     this.moveListFilter = null;
     this.judgementCycleIndex.clear();
     this.classPlies = buildClassPlies(review.moves);
@@ -573,11 +578,26 @@ export class GameReviewPanel {
     if (!this.game) {
       return;
     }
-    const fensAfter = this.game.moves.map((m) => m.fenAfter);
-    const fen = fenAtPly(this.game.initialFen, fensAfter, this.currentPly);
-    const move =
-      this.currentPly >= 0 ? this.game.moves[this.currentPly] : undefined;
-    const highlight = move ? uciSquares(move.uci) : null;
+
+    let fen: string;
+    let highlight: { from?: string; to?: string } | undefined;
+
+    const previewBoard = this.resolveEnginePreviewBoard();
+    if (this.enginePreviewIndex !== null && !previewBoard) {
+      this.enginePreviewIndex = null;
+    }
+
+    if (previewBoard) {
+      fen = previewBoard.fen;
+      highlight = previewBoard.highlight;
+    } else {
+      const fensAfter = this.game.moves.map((m) => m.fenAfter);
+      fen = fenAtPly(this.game.initialFen, fensAfter, this.currentPly);
+      const move =
+        this.currentPly >= 0 ? this.game.moves[this.currentPly] : undefined;
+      highlight = move ? uciSquares(move.uci) ?? undefined : undefined;
+    }
+
     renderChessBoard(this.el.boardHost, fen, highlight ?? undefined, this.flipped);
     if (this.review) {
       renderEvalGraph(this.el.evalCanvas, this.review.graph, this.currentPly);
@@ -585,6 +605,68 @@ export class GameReviewPanel {
     this.updateNav();
     this.renderCommentSlice();
     this.highlightActiveMove();
+  }
+
+  private resolveEnginePreviewBoard(): {
+    fen: string;
+    highlight: { from: string; to: string };
+  } | null {
+    if (
+      this.enginePreviewIndex === null ||
+      !this.game ||
+      this.currentPly < 0 ||
+      !this.review
+    ) {
+      return null;
+    }
+
+    const slice = buildCommentSlice(this.review, this.currentPly);
+    const sans = engineLineSans(slice);
+    if (sans.length === 0) {
+      return null;
+    }
+
+    const fenBefore = this.game.moves[this.currentPly]?.fenBefore;
+    if (!fenBefore) {
+      return null;
+    }
+
+    return previewEngineLineMove(
+      fenBefore,
+      sans,
+      this.enginePreviewIndex,
+    );
+  }
+
+  private clearEnginePreview(): void {
+    if (this.enginePreviewIndex !== null) {
+      this.enginePreviewIndex = null;
+    }
+  }
+
+  private onEngineSanClick(index: number): void {
+    if (!this.game || this.currentPly < 0 || !this.review) {
+      return;
+    }
+
+    const slice = buildCommentSlice(this.review, this.currentPly);
+    const sans = engineLineSans(slice);
+    const fenBefore = this.game.moves[this.currentPly]?.fenBefore;
+    if (!fenBefore || sans.length === 0) {
+      return;
+    }
+
+    const preview = previewEngineLineMove(fenBefore, sans, index);
+    if (!preview) {
+      return;
+    }
+
+    if (this.enginePreviewIndex === index) {
+      this.enginePreviewIndex = null;
+    } else {
+      this.enginePreviewIndex = index;
+    }
+    this.refreshView();
   }
 
   private renderCommentSlice(): void {
@@ -618,42 +700,156 @@ export class GameReviewPanel {
         ? "—"
         : `${slice.accuracy.toFixed(1)}%`;
     const sanWithGlyph = formatSanWithGlyph(slice.san, slice.classification);
-    const judgement = judgementComment({
-      classification: slice.classification,
-      bestSan: slice.bestSan,
-      playedIsBest: slice.playedIsBest,
-    });
-    const onlyMoveHint = slice.onlyMove ? " · Lance único" : "";
     const evalLabel =
       slice.evalBefore !== undefined
         ? `${slice.evalBefore} → ${slice.evalAfter}`
         : slice.evalAfter;
 
-    const motorLine =
-      slice.engineLine !== undefined
-        ? `<div class="comment-slice-line comment-slice-secondary">` +
-          `<span class="comment-slice-muted">Motor</span>` +
-          `<span>${escapeHtml(slice.engineLine)}</span>` +
-          `</div>`
-        : "";
+    const headerBtn = document.createElement("button");
+    headerBtn.type = "button";
+    headerBtn.className = `comment-slice-header ${CLASS_CSS[slice.classification]}`;
+    const headerSan = document.createElement("span");
+    headerSan.className = "comment-slice-san";
+    headerSan.textContent = formatMoveRef(slice.ply, slice.color, sanWithGlyph);
+    headerBtn.appendChild(headerSan);
+    headerBtn.addEventListener("click", () => {
+      this.clearEnginePreview();
+      this.refreshView();
+    });
 
-    commentSliceBody.innerHTML = [
-      `<div class="comment-slice-header ${CLASS_CSS[slice.classification]}">` +
-        `<span class="comment-slice-san">${escapeHtml(formatMoveRef(slice.ply, slice.color, sanWithGlyph))}</span>` +
-        `</div>`,
-      `<p class="comment-slice-judgement">${escapeHtml(judgement)}${escapeHtml(onlyMoveHint)}</p>`,
-      motorLine,
-      `<div class="comment-slice-line comment-slice-secondary">` +
-        `<span class="comment-slice-muted">Eval</span>` +
-        `<span>${escapeHtml(evalLabel)}</span>` +
-        `</div>`,
-      `<div class="comment-slice-line comment-slice-secondary">` +
-        `<span class="comment-slice-muted">Precisão</span>` +
-        `<span>${escapeHtml(accuracyLabel)}</span>` +
-        `</div>`,
-    ].join("");
+    const judgementEl = document.createElement("p");
+    judgementEl.className = "comment-slice-judgement";
+    judgementEl.appendChild(this.renderJudgement(slice));
+    if (slice.onlyMove) {
+      judgementEl.append(document.createTextNode(" · Lance único"));
+    }
+
+    const motorLine = this.renderMotorLine(slice);
+    const children: Node[] = [
+      headerBtn,
+      judgementEl,
+      this.renderCommentMetricLine("Eval", evalLabel),
+      this.renderCommentMetricLine("Precisão", accuracyLabel),
+    ];
+    if (motorLine) {
+      children.splice(2, 0, motorLine);
+    }
+    commentSliceBody.append(...children);
 
     commentSliceButton.disabled = true;
+  }
+
+  private renderJudgement(slice: CommentSlice): DocumentFragment {
+    const frag = document.createDocumentFragment();
+    const { classification, bestSan, playedIsBest } = slice;
+    const bestIndex = bestSan !== undefined ? 0 : null;
+
+    const appendText = (text: string): void => {
+      frag.append(document.createTextNode(text));
+    };
+
+    switch (classification) {
+      case "best":
+        appendText("Melhor lance.");
+        break;
+      case "good":
+        appendText("Bom lance.");
+        break;
+      case "inaccuracy":
+        if (bestSan && !playedIsBest) {
+          appendText("Imprecisão. Melhor era ");
+          frag.appendChild(this.createEngineSanButton(bestSan, bestIndex ?? 0));
+          appendText(".");
+        } else {
+          appendText("Imprecisão.");
+        }
+        break;
+      case "mistake":
+        if (bestSan) {
+          appendText("Erro. Melhor era ");
+          frag.appendChild(this.createEngineSanButton(bestSan, bestIndex ?? 0));
+          appendText(".");
+        } else {
+          appendText("Erro.");
+        }
+        break;
+      case "blunder":
+        if (bestSan) {
+          appendText("Blunder. Melhor era ");
+          frag.appendChild(this.createEngineSanButton(bestSan, bestIndex ?? 0));
+          appendText(".");
+        } else {
+          appendText("Blunder.");
+        }
+        break;
+      case "forced":
+        appendText("Lance forçado.");
+        break;
+    }
+
+    return frag;
+  }
+
+  private renderMotorLine(slice: CommentSlice): HTMLElement | null {
+    const sans = engineLineSans(slice);
+    if (sans.length === 0) {
+      return null;
+    }
+
+    const line = document.createElement("div");
+    line.className = "comment-slice-line comment-slice-secondary";
+
+    const label = document.createElement("span");
+    label.className = "comment-slice-muted";
+    label.textContent = "Motor";
+
+    const value = document.createElement("span");
+    value.className = "comment-slice-motor-value";
+
+    const tokens = tokenizeEngineLine(sans, slice.ply, slice.color);
+    for (const token of tokens) {
+      if (token.kind === "num") {
+        const num = document.createElement("span");
+        num.className = "comment-engine-num";
+        num.textContent = token.text;
+        value.appendChild(num);
+      } else {
+        value.appendChild(this.createEngineSanButton(token.san, token.index));
+      }
+    }
+
+    line.append(label, value);
+    return line;
+  }
+
+  private renderCommentMetricLine(
+    labelText: string,
+    valueText: string,
+  ): HTMLElement {
+    const line = document.createElement("div");
+    line.className = "comment-slice-line comment-slice-secondary";
+
+    const label = document.createElement("span");
+    label.className = "comment-slice-muted";
+    label.textContent = labelText;
+
+    const value = document.createElement("span");
+    value.textContent = valueText;
+
+    line.append(label, value);
+    return line;
+  }
+
+  private createEngineSanButton(san: string, index: number): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "comment-engine-san";
+    btn.textContent = san;
+    const pressed = this.enginePreviewIndex === index;
+    btn.setAttribute("aria-pressed", String(pressed));
+    btn.classList.toggle("comment-engine-san-active", pressed);
+    btn.addEventListener("click", () => this.onEngineSanClick(index));
+    return btn;
   }
 
   private highlightActiveMove(): void {
@@ -677,6 +873,28 @@ export class GameReviewPanel {
     const max = (this.game?.moves.length ?? 0) - 1;
     this.el.navPrev.disabled = this.currentPly <= -1;
     this.el.navNext.disabled = this.currentPly >= max;
+
+    if (
+      this.enginePreviewIndex !== null &&
+      this.review &&
+      this.currentPly >= 0
+    ) {
+      const slice = buildCommentSlice(this.review, this.currentPly);
+      const sans = engineLineSans(slice);
+      if (slice && sans.length > 0) {
+        this.el.plyLabel.textContent =
+          `Motor · ${formatEnginePreviewLabel(
+            sans,
+            slice.ply,
+            slice.color,
+            this.enginePreviewIndex,
+          )}`;
+        return;
+      }
+      this.el.plyLabel.textContent = "Linha do motor";
+      return;
+    }
+
     const reviewed =
       this.currentPly >= 0 ? this.review?.moves[this.currentPly] : undefined;
     const onlyMoveHint =
@@ -693,6 +911,7 @@ export class GameReviewPanel {
   }
 
   private goToPly(ply: number): void {
+    this.clearEnginePreview();
     const max = (this.game?.moves.length ?? 0) - 1;
     this.currentPly = Math.max(-1, Math.min(max, ply));
     this.refreshView();
@@ -709,6 +928,33 @@ export class GameReviewPanel {
     const targetPly = Math.round(ratio * (maxPly + 1)) - 1;
     this.goToPly(targetPly);
   }
+}
+
+function engineLineSans(slice: CommentSlice | null): string[] {
+  if (!slice?.engineLine) {
+    return [];
+  }
+  return slice.engineLine.split(" ").filter((san) => san.length > 0);
+}
+
+function formatEnginePreviewLabel(
+  sans: readonly string[],
+  ply: number,
+  color: PlayerColor,
+  index: number,
+): string {
+  const tokens = tokenizeEngineLine(sans, ply, color);
+  const parts: string[] = [];
+  for (const token of tokens) {
+    if (token.kind === "san" && token.index > index) {
+      break;
+    }
+    parts.push(token.kind === "num" ? token.text : token.san);
+    if (token.kind === "san" && token.index === index) {
+      break;
+    }
+  }
+  return parts.join(" ");
 }
 
 function formatMoveRef(
