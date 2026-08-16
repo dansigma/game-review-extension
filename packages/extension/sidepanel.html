@@ -194,6 +194,12 @@
       .class-dashboard-count:disabled {
         opacity: 0.35;
       }
+      .class-dashboard-count.class-dashboard-count-active,
+      .class-dashboard-count[aria-pressed="true"] {
+        outline: 2px solid var(--accent);
+        outline-offset: -1px;
+        background: #2a2926;
+      }
       .class-dashboard-glyph {
         display: flex;
         align-items: center;
@@ -306,6 +312,20 @@
         overflow: auto;
         border: 1px solid #333;
         border-radius: 6px;
+      }
+      .move-list-filter-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 6px;
+        font-size: 11px;
+        color: var(--muted);
+        border-bottom: 1px solid #333;
+      }
+      #move-list-clear-filter {
+        font-size: 11px;
+        padding: 2px 8px;
       }
       progress {
         flex: 1;
@@ -558,6 +578,10 @@
             <button id="comment-slice-button" type="button" disabled>Login necessário para comentar</button>
           </div>
           <div class="move-list-wrap">
+            <div id="move-list-filter-toolbar" class="move-list-filter-toolbar" hidden>
+              <span id="move-list-filter-label"></span>
+              <button id="move-list-clear-filter" type="button">Mostrar todos</button>
+            </div>
             <table id="move-list" aria-label="Lista de lances"></table>
           </div>
         </div>
