@@ -1,3 +1,7 @@
+import {
+  formatMoveEvalAfter,
+  formatMoveEvalBefore,
+} from "./evalDisplay.ts";
 import { isOnlyMove } from "./onlyMove.ts";
 import type {
   AlgoVersion,
@@ -20,6 +24,8 @@ export interface CommentSlice {
   playedIsBest: boolean;
   bestSan?: string;
   onlyMove: boolean;
+  evalAfter: string;
+  evalBefore?: string;
 }
 
 export function buildCommentSlice(
@@ -35,6 +41,9 @@ export function buildCommentSlice(
     return null;
   }
 
+  const evalAfter = formatMoveEvalAfter(move);
+  const evalBefore = formatMoveEvalBefore(move);
+
   return {
     gameId: review.gameId,
     algoVersion: review.algoVersion,
@@ -49,5 +58,7 @@ export function buildCommentSlice(
     playedIsBest: move.playedIsBest,
     bestSan: move.bestSan,
     onlyMove: isOnlyMove(move),
+    evalAfter,
+    evalBefore: evalBefore !== evalAfter ? evalBefore : undefined,
   };
 }

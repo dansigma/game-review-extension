@@ -3,6 +3,7 @@ import {
   classificationGlyph,
   countJudgements,
   formatSanWithGlyph,
+  formatMoveEvalAfter,
   isOnlyMove,
   judgementComment,
   MOVE_CLASS_LABEL_PT,
@@ -337,9 +338,13 @@ export class GameReviewPanel {
 
     const meta = document.createElement("span");
     meta.className = "critical-moment-meta";
+    const evalLabel =
+      moment.evalBefore !== undefined
+        ? `${moment.evalBefore} → ${moment.evalAfter}`
+        : moment.evalAfter;
     meta.innerHTML =
       `<span class="critical-moment-class">${escapeHtml(MOVE_CLASS_LABEL_PT[moment.classification])}</span>` +
-      `<span class="critical-moment-stats">EPL ${moment.epl.toFixed(2)} · ${formatWinSwing(moment.winPercentSwing)}</span>`;
+      `<span class="critical-moment-eval">${escapeHtml(evalLabel)}</span>`;
 
     btn.append(main, meta);
     btn.addEventListener("click", () => this.goToPly(moment.ply));
@@ -388,8 +393,10 @@ export class GameReviewPanel {
     const onlyMoveBadge = isOnlyMove(move)
       ? `<span class="move-only-badge" title="Lance único">Único</span>`
       : "";
+    const evalLabel = formatMoveEvalAfter(move);
     btn.innerHTML =
-      renderSanWithGlyph(move.san, move.classification) + onlyMoveBadge;
+      `<span class="move-main">${renderSanWithGlyph(move.san, move.classification)}${onlyMoveBadge}</span>` +
+      `<span class="move-eval">${escapeHtml(evalLabel)}</span>`;
     if (ply === this.currentPly) {
       btn.classList.add("move-active");
     }
@@ -442,8 +449,6 @@ export class GameReviewPanel {
     commentSliceBody.hidden = false;
     commentSliceBody.replaceChildren();
 
-    const winSwing =
-      slice.playerWinPercentBefore - slice.playerWinPercentAfter;
     const accuracyLabel =
       slice.accuracy === null
         ? "—"
@@ -455,6 +460,10 @@ export class GameReviewPanel {
       playedIsBest: slice.playedIsBest,
     });
     const onlyMoveHint = slice.onlyMove ? " · Lance único" : "";
+    const evalLabel =
+      slice.evalBefore !== undefined
+        ? `${slice.evalBefore} → ${slice.evalAfter}`
+        : slice.evalAfter;
 
     commentSliceBody.innerHTML = [
       `<div class="comment-slice-header ${CLASS_CSS[slice.classification]}">` +
@@ -462,12 +471,8 @@ export class GameReviewPanel {
         `</div>`,
       `<p class="comment-slice-judgement">${escapeHtml(judgement)}${escapeHtml(onlyMoveHint)}</p>`,
       `<div class="comment-slice-line comment-slice-secondary">` +
-        `<span class="comment-slice-muted">EPL</span>` +
-        `<span>${slice.epl.toFixed(2)}</span>` +
-        `</div>`,
-      `<div class="comment-slice-line comment-slice-secondary">` +
-        `<span class="comment-slice-muted">Win%</span>` +
-        `<span>${formatWinPercent(slice.playerWinPercentBefore)} → ${formatWinPercent(slice.playerWinPercentAfter)} (${formatWinSwing(winSwing)})</span>` +
+        `<span class="comment-slice-muted">Eval</span>` +
+        `<span>${escapeHtml(evalLabel)}</span>` +
         `</div>`,
       `<div class="comment-slice-line comment-slice-secondary">` +
         `<span class="comment-slice-muted">Precisão</span>` +
@@ -593,21 +598,6 @@ function formatJudgementSummary(judgements: JudgementsByColor): string {
     formatJudgementLine("white", judgements.white),
     formatJudgementLine("black", judgements.black),
   ].join("\n");
-}
-
-function formatWinSwing(swing: number): string {
-  const rounded = Math.round(swing);
-  if (rounded > 0) {
-    return `−${rounded}% win`;
-  }
-  if (rounded < 0) {
-    return `+${Math.abs(rounded)}% win`;
-  }
-  return "0% win";
-}
-
-function formatWinPercent(value: number): string {
-  return `${Math.round(value)}%`;
 }
 
 function formatResult(result: string): string {

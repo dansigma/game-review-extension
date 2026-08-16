@@ -1,3 +1,7 @@
+import {
+  formatMoveEvalAfter,
+  formatMoveEvalBefore,
+} from "./evalDisplay.ts";
 import type { MoveClass, PlayerColor, ReviewedMove } from "./types.ts";
 
 /** First Lichess glyph threshold (inaccuracy and worse). */
@@ -16,6 +20,8 @@ export interface CriticalMoment {
   epl: number;
   winPercentSwing: number;
   classification: MoveClass;
+  evalAfter: string;
+  evalBefore?: string;
 }
 
 export interface JudgementCounts {
@@ -61,13 +67,19 @@ export function selectCriticalMoments(
 ): CriticalMoment[] {
   return moves
     .filter((move) => isCriticalClassification(move.classification))
-    .map((move) => ({
-      ply: move.ply,
-      color: move.color,
-      san: move.san,
-      epl: move.epl,
-      winPercentSwing: move.playerWinPercentBefore - move.playerWinPercentAfter,
-      classification: move.classification,
-    }))
+    .map((move) => {
+      const evalAfter = formatMoveEvalAfter(move);
+      const evalBefore = formatMoveEvalBefore(move);
+      return {
+        ply: move.ply,
+        color: move.color,
+        san: move.san,
+        epl: move.epl,
+        winPercentSwing: move.playerWinPercentBefore - move.playerWinPercentAfter,
+        classification: move.classification,
+        evalAfter,
+        evalBefore: evalBefore !== evalAfter ? evalBefore : undefined,
+      };
+    })
     .sort((a, b) => a.ply - b.ply);
 }

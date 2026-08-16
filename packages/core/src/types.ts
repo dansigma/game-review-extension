@@ -102,6 +102,10 @@ export interface ReviewedMove {
   playerWinPercentBefore: number;
   playerWinPercentAfter: number;
   whiteWinPercentAfter: number;
+  /** PV1 after the played move, flipped to White's POV. */
+  whiteScoreAfter: EngineScore;
+  /** PV1 before the played move, flipped to White's POV. */
+  whiteScoreBefore: EngineScore;
   bestUci: string;
   /** SAN for engine PV1 before the ply; omitted when UCI→SAN conversion fails. */
   bestSan?: string;
