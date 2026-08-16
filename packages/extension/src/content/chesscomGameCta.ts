@@ -5,6 +5,10 @@ import {
 } from "../chesscomExport.ts";
 import { isLiveChesscomCallback } from "../chesscomProvider.ts";
 import type { BackgroundResponse } from "../messages.ts";
+import {
+  isExtensionContextValid,
+  isInvalidatedContextError,
+} from "./extensionContext.ts";
 
 const CTA_ROOT_ID = "game-review-cta-root";
 
@@ -59,7 +63,26 @@ function gameRefFromPage() {
   return extractChesscomGameRef(window.location.href);
 }
 
+let disposed = false;
+let navigationObserver: MutationObserver | undefined;
+
+function teardown(): void {
+  if (disposed) {
+    return;
+  }
+  disposed = true;
+  removeCta();
+  navigationObserver?.disconnect();
+  navigationObserver = undefined;
+  window.removeEventListener("popstate", onNavigation);
+  window.removeEventListener("hashchange", onNavigation);
+}
+
 async function sendBackground<T>(message: unknown): Promise<T> {
+  if (!isExtensionContextValid()) {
+    teardown();
+    throw new Error("Extension context invalidated");
+  }
   const response = (await chrome.runtime.sendMessage(message)) as BackgroundResponse;
   if (!response || response.ok !== true) {
     throw new Error(response?.error ?? "Falha na comunicação com a extensão");
@@ -93,6 +116,10 @@ function showReviewCta(gameId: string): void {
   button.className = "gr-cta-btn";
   button.textContent = "Analisar partida";
   button.addEventListener("click", () => {
+    if (!isExtensionContextValid()) {
+      teardown();
+      return;
+    }
     button.disabled = true;
     button.textContent = "Abrindo…";
     void chrome.runtime
@@ -105,6 +132,10 @@ function showReviewCta(gameId: string): void {
         button.disabled = false;
       })
       .catch((error: unknown) => {
+        if (isInvalidatedContextError(error)) {
+          teardown();
+          return;
+        }
         const text = error instanceof Error ? error.message : String(error);
         button.textContent = "Erro — tentar de novo";
         button.disabled = false;
@@ -118,6 +149,9 @@ function showReviewCta(gameId: string): void {
 let refreshToken = 0;
 
 async function refreshCta(): Promise<void> {
+  if (disposed) {
+    return;
+  }
   const token = ++refreshToken;
   const ref = gameRefFromPage();
   if (!ref) {
@@ -131,7 +165,7 @@ async function refreshCta(): Promise<void> {
       kind: ref.kind,
       id: ref.id,
     });
-    if (token !== refreshToken) {
+    if (token !== refreshToken || disposed) {
       return;
     }
     if (isLiveChesscomCallback(json)) {
@@ -140,7 +174,11 @@ async function refreshCta(): Promise<void> {
     }
     showReviewCta(buildChesscomTaggedGameId(ref.kind, ref.id));
   } catch (error) {
-    if (token !== refreshToken) {
+    if (token !== refreshToken || disposed) {
+      return;
+    }
+    if (isInvalidatedContextError(error)) {
+      teardown();
       return;
     }
     console.warn("[game-review] chess.com callback check failed", error);
@@ -149,6 +187,9 @@ async function refreshCta(): Promise<void> {
 }
 
 function onNavigation(): void {
+  if (disposed) {
+    return;
+  }
   void refreshCta();
 }
 
@@ -156,6 +197,9 @@ let lastHref = location.href;
 
 function watchNavigation(): void {
   const check = (): void => {
+    if (disposed) {
+      return;
+    }
     if (location.href !== lastHref) {
       lastHref = location.href;
       onNavigation();
@@ -163,7 +207,8 @@ function watchNavigation(): void {
   };
   window.addEventListener("popstate", onNavigation);
   window.addEventListener("hashchange", onNavigation);
-  new MutationObserver(check).observe(document.documentElement, {
+  navigationObserver = new MutationObserver(check);
+  navigationObserver.observe(document.documentElement, {
     childList: true,
     subtree: true,
   });
