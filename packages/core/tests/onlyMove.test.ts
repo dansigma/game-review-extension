@@ -20,6 +20,8 @@ function fakeMove(
     playerWinPercentBefore: overrides.playerWinPercentBefore ?? 55,
     playerWinPercentAfter: overrides.playerWinPercentAfter ?? 54,
     whiteWinPercentAfter: overrides.whiteWinPercentAfter ?? 55,
+    whiteScoreAfter: overrides.whiteScoreAfter ?? { type: "cp", value: 0 },
+    whiteScoreBefore: overrides.whiteScoreBefore ?? { type: "cp", value: 0 },
     bestUci: overrides.bestUci ?? "e2e4",
     playedIsBest: overrides.playedIsBest ?? true,
     ...overrides,

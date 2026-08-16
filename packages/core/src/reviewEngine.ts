@@ -12,6 +12,7 @@ import {
   type ReviewedMove,
   type ReviewEngineInput,
 } from "./types.ts";
+import { whiteScore } from "./evalDisplay.ts";
 import { expectedPointsLost, playerWinPercent, whiteWinPercent } from "./winPercent.ts";
 
 export class ReviewEngineError extends Error {
@@ -130,6 +131,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
 
     const pv1 = bestLine(before);
     const pv2 = secondLine(before);
+    const beforeStm = sideToMoveFromFen(before.fen);
     const playedIsBest = normalizeUci(pv1.pv[0] ?? "") === normalizeUci(move.uci);
     const playerWinBefore = playerWinPercent(pv1.score);
     const afterStm = sideToMoveFromFen(after.fen);
@@ -161,6 +163,8 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       playerWinPercentBefore: playerWinBefore,
       playerWinPercentAfter: playerWinAfter,
       whiteWinPercentAfter: whiteWinPercent(afterBest.score, afterStm),
+      whiteScoreAfter: whiteScore(afterBest.score, afterStm),
+      whiteScoreBefore: whiteScore(pv1.score, beforeStm),
       bestUci,
       ...(bestSan !== undefined ? { bestSan } : {}),
       playedIsBest,
