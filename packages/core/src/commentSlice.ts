@@ -18,6 +18,7 @@ export interface CommentSlice {
   playerWinPercentBefore: number;
   playerWinPercentAfter: number;
   playedIsBest: boolean;
+  bestSan?: string;
   onlyMove: boolean;
 }
 
@@ -46,6 +47,7 @@ export function buildCommentSlice(
     playerWinPercentBefore: move.playerWinPercentBefore,
     playerWinPercentAfter: move.playerWinPercentAfter,
     playedIsBest: move.playedIsBest,
+    bestSan: move.bestSan,
     onlyMove: isOnlyMove(move),
   };
 }

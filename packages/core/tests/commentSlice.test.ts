@@ -86,8 +86,24 @@ describe("buildCommentSlice", () => {
       playerWinPercentBefore: 50,
       playerWinPercentAfter: 49,
       playedIsBest: false,
+      bestSan: undefined,
       onlyMove: false,
     });
+  });
+
+  it("includes bestSan when present on the reviewed move", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 4,
+        color: "white",
+        san: "Bb5",
+        classification: "inaccuracy",
+        bestSan: "d4",
+        playedIsBest: false,
+      }),
+    ]);
+
+    expect(buildCommentSlice(review, 4)?.bestSan).toBe("d4");
   });
 
   it("does not leak engine or UCI fields", () => {

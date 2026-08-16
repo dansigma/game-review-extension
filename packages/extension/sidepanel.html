@@ -185,7 +185,6 @@
       .move-btn {
         width: 100%;
         display: flex;
-        justify-content: space-between;
         align-items: center;
         gap: 6px;
         padding: 4px 6px;
@@ -196,16 +195,24 @@
         outline: 2px solid var(--accent);
         outline-offset: -1px;
       }
-      .move-class {
-        font-size: 10px;
-        opacity: 0.9;
+      .move-san {
+        font-family: ui-monospace, monospace;
+        font-weight: 600;
       }
-      .move-best .move-class { color: var(--move-best); }
-      .move-good .move-class { color: var(--move-good); }
-      .move-inaccuracy .move-class { color: var(--move-inaccuracy); }
-      .move-mistake .move-class { color: var(--move-mistake); }
-      .move-blunder .move-class { color: var(--move-blunder); }
-      .move-forced .move-class { color: var(--move-forced); }
+      .move-glyph {
+        font-weight: 600;
+      }
+      .move-best .move-san,
+      .move-best .move-glyph { color: var(--move-best); }
+      .move-good .move-san,
+      .move-good .move-glyph { color: var(--move-good); }
+      .move-inaccuracy .move-san,
+      .move-inaccuracy .move-glyph { color: var(--move-inaccuracy); }
+      .move-mistake .move-san,
+      .move-mistake .move-glyph { color: var(--move-mistake); }
+      .move-blunder .move-san,
+      .move-blunder .move-glyph { color: var(--move-blunder); }
+      .move-forced .move-san { color: var(--move-forced); }
       .move-only-badge {
         font-size: 9px;
         font-weight: 600;
@@ -282,6 +289,21 @@
         font-weight: 600;
         font-family: ui-monospace, monospace;
       }
+      .critical-moment-btn.move-inaccuracy .critical-moment-move {
+        color: var(--move-inaccuracy);
+      }
+      .critical-moment-btn.move-mistake .critical-moment-move {
+        color: var(--move-mistake);
+      }
+      .critical-moment-btn.move-blunder .critical-moment-move {
+        color: var(--move-blunder);
+      }
+      .critical-moment-btn.move-good .critical-moment-move {
+        color: var(--move-good);
+      }
+      .critical-moment-btn.move-best .critical-moment-move {
+        color: var(--move-best);
+      }
       .critical-moment-color,
       .critical-moment-stats {
         font-size: 11px;
@@ -329,14 +351,44 @@
         border-radius: 6px;
         background: #1a1917;
       }
+      .comment-slice-header .comment-slice-san {
+        font-weight: 600;
+        font-family: ui-monospace, monospace;
+      }
+      .comment-slice-header.move-best .comment-slice-san {
+        color: var(--move-best);
+      }
+      .comment-slice-header.move-good .comment-slice-san {
+        color: var(--move-good);
+      }
+      .comment-slice-header.move-inaccuracy .comment-slice-san {
+        color: var(--move-inaccuracy);
+      }
+      .comment-slice-header.move-mistake .comment-slice-san {
+        color: var(--move-mistake);
+      }
+      .comment-slice-header.move-blunder .comment-slice-san {
+        color: var(--move-blunder);
+      }
+      .comment-slice-header.move-forced .comment-slice-san {
+        color: var(--move-forced);
+      }
+      .comment-slice-judgement {
+        margin: 0;
+        font-size: 13px;
+      }
       .comment-slice-line {
         display: flex;
         justify-content: space-between;
         gap: 8px;
       }
-      .comment-slice-san {
-        font-weight: 600;
-        font-family: ui-monospace, monospace;
+      .comment-slice-secondary {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .comment-slice-secondary span:last-child {
+        color: var(--text);
+        opacity: 0.85;
       }
       .comment-slice-muted {
         color: var(--muted);
