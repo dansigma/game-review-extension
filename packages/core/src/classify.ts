@@ -13,6 +13,16 @@ function isBestQuality(epl: number, playedIsBest: boolean): boolean {
   return playedIsBest || epl < EPL_THRESHOLDS.best;
 }
 
+function hasBrilliantImpact(
+  playerWinPercentBefore: number,
+  playerWinPercentAfter: number,
+): boolean {
+  return (
+    playerWinPercentAfter - playerWinPercentBefore >= 10 ||
+    playerWinPercentAfter >= 85
+  );
+}
+
 export function classifyMove(args: {
   epl: number;
   playedIsBest: boolean;
@@ -41,7 +51,7 @@ export function classifyMove(args: {
     args.isSacrifice &&
     args.playerWinPercentAfter >= 35 &&
     args.playerWinPercentBefore <= 90 &&
-    !args.isOnlyMove
+    hasBrilliantImpact(args.playerWinPercentBefore, args.playerWinPercentAfter)
   ) {
     return "brilliant";
   }

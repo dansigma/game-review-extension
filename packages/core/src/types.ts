@@ -1,5 +1,5 @@
-/** Accuracy curve unchanged (Lichess lila); sacrifice detector uses capture qsearch in v3. */
-export const ALGO_VERSION = "lila-v3" as const;
+/** Accuracy curve unchanged (Lichess lila); sacrifice/Brilliant rules bumped in v4. */
+export const ALGO_VERSION = "lila-v4" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
