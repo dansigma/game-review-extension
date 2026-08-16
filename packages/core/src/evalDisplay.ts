@@ -36,14 +36,11 @@ export function formatEvalPawns(score: EngineScore): string {
   return pawns > 0 ? `+${abs}` : `-${abs}`;
 }
 
-/** Approximate White-POV centipawn score from white win% (cached reviews without scores). */
+/** Approximate White-POV centipawn score from White win% (cached reviews without scores). */
 export function approximateCpScoreFromWhiteWinPercent(
   whiteWinPercent: number,
-  sideToMove: PlayerColor,
 ): EngineScore {
-  const stmWin =
-    sideToMove === "white" ? whiteWinPercent : 100 - whiteWinPercent;
-  const clamped = Math.min(99.5, Math.max(0.5, stmWin)) / 100;
+  const clamped = Math.min(99.5, Math.max(0.5, whiteWinPercent)) / 100;
   const cp = Math.round(-Math.log(1 / clamped - 1) / CP_TO_WIN_SLOPE);
   return { type: "cp", value: cp };
 }
@@ -52,12 +49,8 @@ export function formatMoveEvalAfter(move: ReviewedMove): string {
   if (move.whiteScoreAfter) {
     return formatEvalPawns(move.whiteScoreAfter);
   }
-  const afterStm: PlayerColor = move.color === "white" ? "black" : "white";
   return formatEvalPawns(
-    approximateCpScoreFromWhiteWinPercent(
-      move.whiteWinPercentAfter,
-      afterStm,
-    ),
+    approximateCpScoreFromWhiteWinPercent(move.whiteWinPercentAfter),
   );
 }
 
@@ -70,7 +63,7 @@ export function formatMoveEvalBefore(move: ReviewedMove): string {
       ? move.playerWinPercentBefore
       : 100 - move.playerWinPercentBefore;
   return formatEvalPawns(
-    approximateCpScoreFromWhiteWinPercent(whiteWinBefore, move.color),
+    approximateCpScoreFromWhiteWinPercent(whiteWinBefore),
   );
 }
 

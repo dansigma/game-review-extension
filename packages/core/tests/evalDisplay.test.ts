@@ -57,14 +57,23 @@ describe("formatMoveEvalAfter", () => {
     expect(formatMoveEvalAfter(move)).toBe("-2.2");
   });
 
-  it("falls back to whiteWinPercentAfter when score is missing", () => {
+  it("falls back to whiteWinPercentAfter for a White move without scores", () => {
     const move = {
-      ply: 1,
-      color: "black",
+      ply: 0,
+      color: "white",
       whiteWinPercentAfter: 55,
     } as ReviewedMove;
 
-    const label = formatMoveEvalAfter(move);
-    expect(label).toMatch(/^\+/);
+    expect(formatMoveEvalAfter(move)).toMatch(/^\+/);
+  });
+
+  it("falls back to whiteWinPercentAfter for a Black move without scores", () => {
+    const move = {
+      ply: 1,
+      color: "black",
+      whiteWinPercentAfter: 40,
+    } as ReviewedMove;
+
+    expect(formatMoveEvalAfter(move)).toMatch(/^-/);
   });
 });
