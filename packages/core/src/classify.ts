@@ -39,7 +39,7 @@ export function classifyMove(args: {
   if (
     !args.playedIsBest &&
     args.previousOpponentEpl !== undefined &&
-    args.previousOpponentEpl >= EPL_THRESHOLDS.inaccuracy &&
+    args.previousOpponentEpl >= EPL_THRESHOLDS.missPreviousOpponent &&
     args.playerWinPercentBefore >= 60 &&
     args.playerWinPercentBefore - args.playerWinPercentAfter >= 10
   ) {
@@ -75,14 +75,8 @@ export function classifyMove(args: {
     }
   }
 
-  if (args.playedIsBest || args.epl < EPL_THRESHOLDS.best) {
+  if (args.playedIsBest || args.epl < EPL_THRESHOLDS.bestBandMax) {
     return "best";
-  }
-  if (args.epl < EPL_THRESHOLDS.good) {
-    return "good";
-  }
-  if (args.epl < EPL_THRESHOLDS.inaccuracy) {
-    return "inaccuracy";
   }
   if (args.epl < EPL_THRESHOLDS.mistake) {
     return "mistake";

@@ -37,13 +37,13 @@ describe("classifyMove", () => {
           epl: 0.2,
           playerWinPercentBefore: 70,
           playerWinPercentAfter: 55,
-          previousOpponentEpl: EPL_THRESHOLDS.inaccuracy,
+          previousOpponentEpl: EPL_THRESHOLDS.missPreviousOpponent,
         }),
       ),
     ).toBe("miss");
   });
 
-  it("does not classify Miss when previous opponent EPL is below inaccuracy", () => {
+  it("does not classify Miss when previous opponent EPL is below miss gate", () => {
     expect(
       classifyMove(
         baseArgs({
@@ -51,7 +51,7 @@ describe("classifyMove", () => {
           epl: 0.2,
           playerWinPercentBefore: 70,
           playerWinPercentAfter: 55,
-          previousOpponentEpl: EPL_THRESHOLDS.inaccuracy - 0.01,
+          previousOpponentEpl: EPL_THRESHOLDS.missPreviousOpponent - 0.01,
         }),
       ),
     ).toBe("blunder");
@@ -190,7 +190,7 @@ describe("classifyMove", () => {
     ).toBe("great");
   });
 
-  it("maps EPL to Best / Good / Imprecisão / Erro / Blunder", () => {
+  it("maps EPL to Best / Erro / Blunder", () => {
     expect(
       classifyMove(baseArgs({ epl: 0, playedIsBest: true })),
     ).toBe("best");
@@ -198,12 +198,12 @@ describe("classifyMove", () => {
       classifyMove(
         baseArgs({ epl: 0.03, playedIsBest: false, playerWinPercentAfter: 47 }),
       ),
-    ).toBe("good");
+    ).toBe("best");
     expect(
       classifyMove(
         baseArgs({ epl: 0.08, playedIsBest: false, playerWinPercentAfter: 42 }),
       ),
-    ).toBe("inaccuracy");
+    ).toBe("mistake");
     expect(
       classifyMove(
         baseArgs({ epl: 0.12, playedIsBest: false, playerWinPercentAfter: 38 }),

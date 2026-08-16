@@ -37,7 +37,7 @@ describe("selectCriticalMoments", () => {
     expect(result[0]?.ply).toBe(1);
   });
 
-  it("never selects Best, Great or Good moves", () => {
+  it("never selects Best, Great or other non-critical moves", () => {
     const moves = [
       fakeMove({
         ply: 0,
@@ -46,20 +46,20 @@ describe("selectCriticalMoments", () => {
         classification: "best",
         playedIsBest: true,
       }),
-      fakeMove({ ply: 1, color: "black", epl: 0.04, classification: "good" }),
+      fakeMove({ ply: 1, color: "black", epl: 0.04, classification: "best" }),
       fakeMove({ ply: 2, color: "white", epl: 0.01, classification: "great" }),
-      fakeMove({ ply: 3, color: "black", epl: 0.12, classification: "inaccuracy" }),
+      fakeMove({ ply: 3, color: "black", epl: 0.12, classification: "mistake" }),
       fakeMove({ ply: 4, color: "white", epl: 0.14, classification: "miss" }),
     ];
     const result = selectCriticalMoments(moves);
     expect(result).toHaveLength(2);
     expect(result.map((m) => m.ply)).toEqual([3, 4]);
-    expect(result.map((m) => m.classification)).toEqual(["inaccuracy", "miss"]);
+    expect(result.map((m) => m.classification)).toEqual(["mistake", "miss"]);
   });
 
-  it("returns all four white inaccuracies in ply order (no per-color cap)", () => {
+  it("returns all four white critical moves in ply order (no per-color cap)", () => {
     const whiteMoves = [
-      fakeMove({ ply: 0, color: "white", epl: 0.1, classification: "inaccuracy", san: "W0" }),
+      fakeMove({ ply: 0, color: "white", epl: 0.1, classification: "mistake", san: "W0" }),
       fakeMove({ ply: 2, color: "white", epl: 0.15, classification: "mistake", san: "W1" }),
       fakeMove({ ply: 4, color: "white", epl: 0.2, classification: "mistake", san: "W2" }),
       fakeMove({ ply: 6, color: "white", epl: 0.25, classification: "blunder", san: "W3" }),
@@ -68,7 +68,7 @@ describe("selectCriticalMoments", () => {
     expect(result).toHaveLength(4);
     expect(result.map((m) => m.ply)).toEqual([0, 2, 4, 6]);
     expect(result.map((m) => m.classification)).toEqual([
-      "inaccuracy",
+      "mistake",
       "mistake",
       "mistake",
       "blunder",
@@ -80,7 +80,7 @@ describe("selectCriticalMoments", () => {
     const moves = [
       fakeMove({ ply: 5, color: "black", epl: 0.4, classification: "blunder", san: "Nf6" }),
       fakeMove({ ply: 2, color: "white", epl: 0.25, classification: "mistake", san: "d4" }),
-      fakeMove({ ply: 8, color: "black", epl: 0.15, classification: "inaccuracy", san: "Qh5" }),
+      fakeMove({ ply: 8, color: "black", epl: 0.15, classification: "mistake", san: "Qh5" }),
       fakeMove({ ply: 4, color: "white", epl: 0.35, classification: "blunder", san: "Bc4" }),
     ];
     const result = selectCriticalMoments(moves);
@@ -93,7 +93,7 @@ describe("selectCriticalMoments", () => {
     expect(
       selectCriticalMoments([
         fakeMove({ ply: 0, color: "white", epl: 0.01, accuracy: 99, classification: "best" }),
-        fakeMove({ ply: 1, color: "black", epl: 0.02, accuracy: 98, classification: "good" }),
+        fakeMove({ ply: 1, color: "black", epl: 0.02, accuracy: 98, classification: "best" }),
       ]),
     ).toEqual([]);
   });
@@ -115,37 +115,33 @@ describe("selectCriticalMoments", () => {
 });
 
 describe("countJudgements", () => {
-  it("counts best, good, inaccuracy, mistake and blunder per color", () => {
+  it("counts best, mistake and blunder per color", () => {
     const moves = [
-      fakeMove({ ply: 0, color: "white", epl: 0.1, classification: "inaccuracy" }),
-      fakeMove({ ply: 2, color: "white", epl: 0.12, classification: "inaccuracy" }),
+      fakeMove({ ply: 0, color: "white", epl: 0.1, classification: "mistake" }),
+      fakeMove({ ply: 2, color: "white", epl: 0.12, classification: "mistake" }),
       fakeMove({ ply: 4, color: "white", epl: 0.2, classification: "blunder" }),
-      fakeMove({ ply: 1, color: "black", epl: 0.11, classification: "inaccuracy" }),
+      fakeMove({ ply: 1, color: "black", epl: 0.11, classification: "mistake" }),
       fakeMove({ ply: 3, color: "black", epl: 0.16, classification: "mistake" }),
       fakeMove({ ply: 5, color: "black", epl: 0.3, classification: "blunder" }),
       fakeMove({ ply: 6, color: "black", epl: 0.35, classification: "blunder" }),
       fakeMove({ ply: 7, color: "white", epl: 0.01, classification: "best" }),
       fakeMove({ ply: 8, color: "black", epl: 0.5, classification: "forced" }),
-      fakeMove({ ply: 9, color: "black", epl: 0.03, classification: "good" }),
+      fakeMove({ ply: 9, color: "black", epl: 0.03, classification: "best" }),
     ];
     expect(countJudgements(moves)).toEqual({
       white: {
         brilliant: 0,
         great: 0,
         best: 1,
-        good: 0,
-        inaccuracy: 2,
-        mistake: 0,
+        mistake: 2,
         miss: 0,
         blunder: 1,
       },
       black: {
         brilliant: 0,
         great: 0,
-        best: 0,
-        good: 1,
-        inaccuracy: 1,
-        mistake: 1,
+        best: 1,
+        mistake: 2,
         miss: 0,
         blunder: 2,
       },

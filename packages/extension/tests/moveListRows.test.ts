@@ -29,8 +29,8 @@ function fakeMove(
 describe("moveListRows", () => {
   const fourPlies: ReviewedMove[] = [
     fakeMove({ ply: 0, color: "white", san: "e4", classification: "best" }),
-    fakeMove({ ply: 1, color: "black", san: "e5", classification: "good" }),
-    fakeMove({ ply: 2, color: "white", san: "Nf3", classification: "good" }),
+    fakeMove({ ply: 1, color: "black", san: "e5", classification: "best" }),
+    fakeMove({ ply: 2, color: "white", san: "Nf3", classification: "best" }),
     fakeMove({
       ply: 3,
       color: "black",
@@ -53,12 +53,12 @@ describe("moveListRows", () => {
   it("filters black blunders with empty white cell and preserved move number", () => {
     const moves: ReviewedMove[] = [
       fakeMove({ ply: 0, color: "white", san: "e4", classification: "best" }),
-      fakeMove({ ply: 1, color: "black", san: "e5", classification: "good" }),
+      fakeMove({ ply: 1, color: "black", san: "e5", classification: "best" }),
       fakeMove({
         ply: 2,
         color: "white",
         san: "Nf3",
-        classification: "good",
+        classification: "best",
       }),
       fakeMove({
         ply: 3,
@@ -87,29 +87,29 @@ describe("moveListRows", () => {
     expect(rows[1]?.black?.san).toBe("a6");
   });
 
-  it("filters white inaccuracies with empty black cell", () => {
+  it("filters white mistakes with empty black cell", () => {
     const moves: ReviewedMove[] = [
       fakeMove({
         ply: 0,
         color: "white",
         san: "d4",
-        classification: "inaccuracy",
+        classification: "mistake",
       }),
       fakeMove({ ply: 1, color: "black", san: "d5", classification: "best" }),
       fakeMove({ ply: 2, color: "white", san: "c4", classification: "best" }),
-      fakeMove({ ply: 3, color: "black", san: "e6", classification: "good" }),
+      fakeMove({ ply: 3, color: "black", san: "e6", classification: "best" }),
       fakeMove({
         ply: 4,
         color: "white",
         san: "Nc3",
-        classification: "inaccuracy",
+        classification: "mistake",
       }),
-      fakeMove({ ply: 5, color: "black", san: "Nf6", classification: "good" }),
+      fakeMove({ ply: 5, color: "black", san: "Nf6", classification: "best" }),
     ];
 
     const filter: MoveListFilter = {
       color: "white",
-      classification: "inaccuracy",
+      classification: "mistake",
     };
     const rows = moveListRows(moves, filter);
 
@@ -138,7 +138,7 @@ describe("moveListRows", () => {
         classification: "forced",
       }),
       fakeMove({ ply: 2, color: "white", san: "Nf3", classification: "best" }),
-      fakeMove({ ply: 3, color: "black", san: "Nc6", classification: "good" }),
+      fakeMove({ ply: 3, color: "black", san: "Nc6", classification: "mistake" }),
     ];
 
     const filter: MoveListFilter = { color: "black", classification: "best" };

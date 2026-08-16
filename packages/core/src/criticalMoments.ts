@@ -4,11 +4,10 @@ import {
 } from "./evalDisplay.ts";
 import type { MoveClass, PlayerColor, ReviewedMove } from "./types.ts";
 
-/** First Lichess glyph threshold (inaccuracy and worse). */
+/** EPL floor for critical-moment selection (mistake band starts here). */
 export const CRITICAL_EPL_MIN = 0.05;
 
 const CRITICAL_CLASSIFICATIONS = new Set<MoveClass>([
-  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
@@ -18,8 +17,6 @@ const DASHBOARD_CLASSIFICATIONS = new Set<MoveClass>([
   "brilliant",
   "great",
   "best",
-  "good",
-  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
@@ -30,8 +27,6 @@ export const DASHBOARD_CLASSES: (keyof JudgementCounts)[] = [
   "brilliant",
   "great",
   "best",
-  "good",
-  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
@@ -52,8 +47,6 @@ export interface JudgementCounts {
   brilliant: number;
   great: number;
   best: number;
-  good: number;
-  inaccuracy: number;
   mistake: number;
   miss: number;
   blunder: number;
@@ -65,8 +58,6 @@ const EMPTY_JUDGEMENTS: JudgementCounts = {
   brilliant: 0,
   great: 0,
   best: 0,
-  good: 0,
-  inaccuracy: 0,
   mistake: 0,
   miss: 0,
   blunder: 0,
@@ -74,7 +65,7 @@ const EMPTY_JUDGEMENTS: JudgementCounts = {
 
 function isCriticalClassification(
   classification: MoveClass,
-): classification is "inaccuracy" | "mistake" | "miss" | "blunder" {
+): classification is "mistake" | "miss" | "blunder" {
   return CRITICAL_CLASSIFICATIONS.has(classification);
 }
 
