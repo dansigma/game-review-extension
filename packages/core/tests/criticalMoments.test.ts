@@ -37,7 +37,7 @@ describe("selectCriticalMoments", () => {
     expect(result[0]?.ply).toBe(1);
   });
 
-  it("never selects Best or Good moves", () => {
+  it("never selects Best, Great or Good moves", () => {
     const moves = [
       fakeMove({
         ply: 0,
@@ -47,12 +47,14 @@ describe("selectCriticalMoments", () => {
         playedIsBest: true,
       }),
       fakeMove({ ply: 1, color: "black", epl: 0.04, classification: "good" }),
-      fakeMove({ ply: 2, color: "white", epl: 0.12, classification: "inaccuracy" }),
+      fakeMove({ ply: 2, color: "white", epl: 0.01, classification: "great" }),
+      fakeMove({ ply: 3, color: "black", epl: 0.12, classification: "inaccuracy" }),
+      fakeMove({ ply: 4, color: "white", epl: 0.14, classification: "miss" }),
     ];
     const result = selectCriticalMoments(moves);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.ply).toBe(2);
-    expect(result[0]?.classification).toBe("inaccuracy");
+    expect(result).toHaveLength(2);
+    expect(result.map((m) => m.ply)).toEqual([3, 4]);
+    expect(result.map((m) => m.classification)).toEqual(["inaccuracy", "miss"]);
   });
 
   it("returns all four white inaccuracies in ply order (no per-color cap)", () => {
@@ -127,8 +129,26 @@ describe("countJudgements", () => {
       fakeMove({ ply: 9, color: "black", epl: 0.03, classification: "good" }),
     ];
     expect(countJudgements(moves)).toEqual({
-      white: { best: 1, good: 0, inaccuracy: 2, mistake: 0, blunder: 1 },
-      black: { best: 0, good: 1, inaccuracy: 1, mistake: 1, blunder: 2 },
+      white: {
+        brilliant: 0,
+        great: 0,
+        best: 1,
+        good: 0,
+        inaccuracy: 2,
+        mistake: 0,
+        miss: 0,
+        blunder: 1,
+      },
+      black: {
+        brilliant: 0,
+        great: 0,
+        best: 0,
+        good: 1,
+        inaccuracy: 1,
+        mistake: 1,
+        miss: 0,
+        blunder: 2,
+      },
     });
   });
 });

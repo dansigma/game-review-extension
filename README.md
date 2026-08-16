@@ -36,7 +36,7 @@ npm run build:extension
 Reabrir a mesma partida finalizada (Lichess ou PGN colado) não reexecuta o Stockfish se o cache acertar. A chave inclui:
 
 - `gameId`
-- `algoVersion` (`lila-v1`)
+- `algoVersion` (`lila-v2`)
 - `engineId` (`sf_18`)
 - `nodesPerPosition` (`400000`)
 
@@ -47,13 +47,13 @@ Formato: `gameId|algoVersion|engineId|nodesPerPosition`. Mudar `ALGO_VERSION` in
 Padrão: `go nodes 400000`, MultiPV=2, Threads=1, `sf_18` (NNUE completo) no Side Panel.
 Presets: Rápido 80k, Padrão 400k, Profundo 1,5M. WASM com 1 thread não reproduz bitwise o fishnet do Lichess (~1,5M nodes, nativo). Fechar o painel cancela a análise; offscreen fica para depois.
 
-## Precisão (`lila-v1`)
+## Precisão (`lila-v2`)
 
 Win% usa a curva logística do Lichess (`0.00368208`); mates convertem para cp antes da logística. Precisão de lance e partida segue o código do Lichess (`AccuracyPercent.scala`):
 
 - Lance: curva `103.1668… * exp(-0.04354… * winDiff) - 3.1669…` com bônus +1 de incerteza
 - Partida: média ponderada por volatilidade (desvio padrão populacional das janelas de Win%) + média harmônica, por cor
-- Classes: Best / Good / Imprecisão / Erro / Blunder (limiares EPL 0,02 / 0,05 / 0,10 / 0,15)
+- Classes: Brilliant / Great / Best / Good / Imprecisão / Erro / Miss / Blunder (limiares EPL 0,02 / 0,05 / 0,10 / 0,15; Miss/Brilliant/Great com regras adicionais)
 - Hopeless (win% ≤ 10) → Forced, mas a precisão **ainda é calculada** e entra no agregado
 
 ## Licenças
@@ -64,4 +64,4 @@ Win% usa a curva logística do Lichess (`0.00368208`); mates convertem para cp a
 
 ## Fora do MVP
 
-Sem conta, sem backend, sem Chess.com, sem Brilliant, sem engine em partida ao vivo, sem importar várias partidas de um único arquivo PGN. Não é fork de Pawn Appétit nem de chess.com.puter.
+Sem conta, sem backend, sem Chess.com, sem engine em partida ao vivo, sem importar várias partidas de um único arquivo PGN. Não é fork de Pawn Appétit nem de chess.com.puter.

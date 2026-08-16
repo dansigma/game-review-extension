@@ -77,13 +77,12 @@ describe("reviewGame on PGN fixtures", () => {
     });
 
     expect(review.algoVersion).toBe(ALGO_VERSION);
-    expect(review.algoVersion).toBe("lila-v1");
     expect(review.moves.map((move) => move.classification)).toEqual([
       "best",
       "good",
       "inaccuracy",
       "mistake",
-      "blunder",
+      "miss",
       "best",
     ]);
     expect(review.moves.map((move) => move.classificationLabel)).toEqual([
@@ -91,7 +90,7 @@ describe("reviewGame on PGN fixtures", () => {
       "Good",
       "Imprecisão",
       "Erro",
-      "Blunder",
+      "Miss",
       "Best",
     ]);
     expect(review.moves[0]?.playedIsBest).toBe(true);
@@ -194,7 +193,7 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.gameId).toBe("fixture1");
     expect(review.moves).toHaveLength(7);
     expect(review.moves[6]?.san).toBe("Qxf7#");
-    expect(review.moves[6]?.classification).toBe("best");
+    expect(review.moves[6]?.classification).toBe("brilliant");
   });
 
   it("rejects a wrong number of evals", () => {
@@ -243,6 +242,7 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.moves[0]?.alternativePlayerWinPercent).toBeCloseTo(pv2Win, 5);
     expect(review.moves[0]?.playerWinPercentBefore).toBeCloseTo(pv1Win, 5);
     expect(isOnlyMove(review.moves[0]!)).toBe(true);
+    expect(review.moves[0]?.classification).toBe("great");
   });
 
   it("does not flag only-move when PV1 and PV2 win% are close", () => {
@@ -472,5 +472,56 @@ describe("reviewGame on PGN fixtures", () => {
 
     expect(review.moves[0]?.bestLineSan).toBe("e4");
     expect(review.moves[0]?.bestLineSan).not.toMatch(/[a-h][1-8][a-h][1-8]/);
+  });
+
+  it("classifies Miss when opponent blundered and player drops 15% off-book", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    const secondMove = game.moves[1];
+    expect(firstMove?.uci).toBe("e2e4");
+    expect(secondMove?.uci).toBe("e7e5");
+
+    const whiteBefore = 65;
+    const blackBefore = 70;
+    const blackAfter = 55;
+
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(whiteBefore) }, "d2d4"),
+          line(2, { type: "cp", value: cpFromWinPercent(whiteBefore) - 5 }, "e2e4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(blackBefore) }, "c7c5"),
+          line(2, { type: "cp", value: cpFromWinPercent(blackBefore) - 5 }, "e7e5"),
+        ],
+      },
+      {
+        fen: secondMove?.fenAfter ?? "",
+        ply: 2,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(100 - blackAfter) }, "g1f3"),
+          line(2, { type: "cp", value: cpFromWinPercent(100 - blackAfter) - 5 }, "b8c6"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 2) },
+      evals,
+      engineId: "sf_18",
+    });
+
+    expect(review.moves[0]?.classification).not.toBe("miss");
+    expect(review.moves[0]?.epl).toBeGreaterThanOrEqual(0.1);
+    expect(review.moves[1]?.classification).toBe("miss");
+    expect(review.moves[1]?.playerWinPercentBefore).toBeCloseTo(blackBefore, 4);
+    expect(review.moves[1]?.playerWinPercentAfter).toBeCloseTo(blackAfter, 4);
   });
 });
