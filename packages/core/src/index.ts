@@ -64,6 +64,7 @@ export {
 export type { OnlyMove } from "./onlyMove.ts";
 export { parsePgn, PgnParseError, STANDARD_START_FEN } from "./parsePgn.ts";
 export { reviewGame, ReviewEngineError } from "./reviewEngine.ts";
+export { ENGINE_PV_SAN_MAX, uciPvToSan } from "./pvSan.ts";
 export {
   approximateCpScoreFromWhiteWinPercent,
   formatEvalPawns,

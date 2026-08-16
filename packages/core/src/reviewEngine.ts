@@ -13,6 +13,7 @@ import {
   type ReviewEngineInput,
 } from "./types.ts";
 import { whiteScore } from "./evalDisplay.ts";
+import { uciPvToSan } from "./pvSan.ts";
 import { expectedPointsLost, playerWinPercent, whiteWinPercent } from "./winPercent.ts";
 
 export class ReviewEngineError extends Error {
@@ -150,6 +151,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
 
     const bestUci = pv1.pv[0] ?? move.uci;
     const bestSan = uciToSan(move.fenBefore, bestUci);
+    const bestLineSan = uciPvToSan(move.fenBefore, pv1.pv);
 
     reviewed.push({
       ply: move.ply,
@@ -167,6 +169,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       whiteScoreBefore: whiteScore(pv1.score, beforeStm),
       bestUci,
       ...(bestSan !== undefined ? { bestSan } : {}),
+      ...(bestLineSan !== undefined ? { bestLineSan } : {}),
       playedIsBest,
       alternativeUci: pv2?.pv[0],
       alternativePlayerWinPercent: pv2
