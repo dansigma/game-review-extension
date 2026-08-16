@@ -1,3 +1,4 @@
+import { Chess } from "chess.js";
 import { gameAccuracy, moveAccuracyFromWinPercents } from "./accuracy.ts";
 import { classificationLabel, classifyMove } from "./classify.ts";
 import {
@@ -52,6 +53,19 @@ function secondLine(position: PositionEval): EngineLine | undefined {
 
 function normalizeUci(uci: string): string {
   return uci.trim().toLowerCase();
+}
+
+function uciToSan(fen: string, uci: string): string | undefined {
+  try {
+    const chess = new Chess(fen);
+    const from = uci.slice(0, 2);
+    const to = uci.slice(2, 4);
+    const promotion = uci.length > 4 ? uci[4] : undefined;
+    const move = chess.move({ from, to, promotion });
+    return move?.san;
+  } catch {
+    return undefined;
+  }
 }
 
 function playerAccuracy(
@@ -132,6 +146,9 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       playerWinAfter,
     );
 
+    const bestUci = pv1.pv[0] ?? move.uci;
+    const bestSan = uciToSan(move.fenBefore, bestUci);
+
     reviewed.push({
       ply: move.ply,
       san: move.san,
@@ -144,7 +161,8 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       playerWinPercentBefore: playerWinBefore,
       playerWinPercentAfter: playerWinAfter,
       whiteWinPercentAfter: whiteWinPercent(afterBest.score, afterStm),
-      bestUci: pv1.pv[0] ?? move.uci,
+      bestUci,
+      ...(bestSan !== undefined ? { bestSan } : {}),
       playedIsBest,
       alternativeUci: pv2?.pv[0],
       alternativePlayerWinPercent: pv2

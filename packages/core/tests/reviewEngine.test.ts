@@ -99,6 +99,16 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.white.movesCounted).toBeGreaterThan(0);
     expect(review.black.movesCounted).toBeGreaterThan(0);
     expect(review.moves.every((move) => !isOnlyMove(move))).toBe(true);
+
+    const offBook = review.moves.filter((move) => !move.playedIsBest);
+    expect(offBook.length).toBeGreaterThan(0);
+    expect(
+      offBook.some(
+        (move) =>
+          move.bestSan !== undefined &&
+          !/^[a-h][1-8][a-h][1-8]/.test(move.bestSan),
+      ),
+    ).toBe(true);
   });
 
   it("marks hopeless plies Forced but still computes accuracy", () => {

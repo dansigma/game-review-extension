@@ -1,7 +1,10 @@
 import {
   buildCommentSlice,
+  classificationGlyph,
   countJudgements,
+  formatSanWithGlyph,
   isOnlyMove,
+  judgementComment,
   MOVE_CLASS_LABEL_PT,
   selectCriticalMoments,
   type CriticalMoment,
@@ -327,8 +330,9 @@ export class GameReviewPanel {
 
     const main = document.createElement("span");
     main.className = "critical-moment-main";
+    const sanWithGlyph = formatSanWithGlyph(moment.san, moment.classification);
     main.innerHTML =
-      `<span class="critical-moment-move">${escapeHtml(formatMoveRef(moment.ply, moment.color, moment.san))}</span>` +
+      `<span class="critical-moment-move">${escapeHtml(formatMoveRef(moment.ply, moment.color, sanWithGlyph))}</span>` +
       `<span class="critical-moment-color">${escapeHtml(colorLabelPt(moment.color))}</span>`;
 
     const meta = document.createElement("span");
@@ -380,14 +384,12 @@ export class GameReviewPanel {
     btn.type = "button";
     btn.className = `move-btn ${CLASS_CSS[move.classification]}`;
     btn.dataset.ply = String(ply);
-    btn.title = MOVE_CLASS_LABEL_PT[move.classification];
+    btn.title = move.classificationLabel;
     const onlyMoveBadge = isOnlyMove(move)
       ? `<span class="move-only-badge" title="Lance único">Único</span>`
       : "";
     btn.innerHTML =
-      `<span class="move-san">${escapeHtml(move.san)}</span>` +
-      onlyMoveBadge +
-      `<span class="move-class">${escapeHtml(move.classificationLabel)}</span>`;
+      renderSanWithGlyph(move.san, move.classification) + onlyMoveBadge;
     if (ply === this.currentPly) {
       btn.classList.add("move-active");
     }
@@ -446,29 +448,30 @@ export class GameReviewPanel {
       slice.accuracy === null
         ? "—"
         : `${slice.accuracy.toFixed(1)}%`;
-    const bestLabel = slice.playedIsBest ? "Melhor lance" : "Não é o melhor";
-    const onlyMoveLabel = slice.onlyMove ? " · Lance único" : "";
+    const sanWithGlyph = formatSanWithGlyph(slice.san, slice.classification);
+    const judgement = judgementComment({
+      classification: slice.classification,
+      bestSan: slice.bestSan,
+      playedIsBest: slice.playedIsBest,
+    });
+    const onlyMoveHint = slice.onlyMove ? " · Lance único" : "";
 
     commentSliceBody.innerHTML = [
-      `<div class="comment-slice-line">` +
-        `<span class="comment-slice-san">${escapeHtml(formatMoveRef(slice.ply, slice.color, slice.san))}</span>` +
-        `<span>${escapeHtml(MOVE_CLASS_LABEL_PT[slice.classification])}</span>` +
+      `<div class="comment-slice-header ${CLASS_CSS[slice.classification]}">` +
+        `<span class="comment-slice-san">${escapeHtml(formatMoveRef(slice.ply, slice.color, sanWithGlyph))}</span>` +
         `</div>`,
-      `<div class="comment-slice-line">` +
+      `<p class="comment-slice-judgement">${escapeHtml(judgement)}${escapeHtml(onlyMoveHint)}</p>`,
+      `<div class="comment-slice-line comment-slice-secondary">` +
         `<span class="comment-slice-muted">EPL</span>` +
         `<span>${slice.epl.toFixed(2)}</span>` +
         `</div>`,
-      `<div class="comment-slice-line">` +
+      `<div class="comment-slice-line comment-slice-secondary">` +
         `<span class="comment-slice-muted">Win%</span>` +
         `<span>${formatWinPercent(slice.playerWinPercentBefore)} → ${formatWinPercent(slice.playerWinPercentAfter)} (${formatWinSwing(winSwing)})</span>` +
         `</div>`,
-      `<div class="comment-slice-line">` +
+      `<div class="comment-slice-line comment-slice-secondary">` +
         `<span class="comment-slice-muted">Precisão</span>` +
         `<span>${escapeHtml(accuracyLabel)}</span>` +
-        `</div>`,
-      `<div class="comment-slice-line">` +
-        `<span class="comment-slice-muted">Motor</span>` +
-        `<span>${escapeHtml(bestLabel)}${escapeHtml(onlyMoveLabel)}</span>` +
         `</div>`,
     ].join("");
 
@@ -548,12 +551,27 @@ function pairMoves(moves: readonly ReviewedMove[]): MoveRow[] {
   return rows;
 }
 
-function formatMoveRef(ply: number, color: PlayerColor, san: string): string {
+function formatMoveRef(
+  ply: number,
+  color: PlayerColor,
+  sanWithGlyph: string,
+): string {
   const moveNum = Math.floor(ply / 2) + 1;
   if (color === "white") {
-    return `${moveNum}. ${san}`;
+    return `${moveNum}. ${sanWithGlyph}`;
   }
-  return `${moveNum}... ${san}`;
+  return `${moveNum}... ${sanWithGlyph}`;
+}
+
+function renderSanWithGlyph(san: string, classification: MoveClass): string {
+  const glyph = classificationGlyph(classification);
+  if (!glyph) {
+    return `<span class="move-san">${escapeHtml(san)}</span>`;
+  }
+  return (
+    `<span class="move-san">${escapeHtml(san)}` +
+    `<span class="move-glyph">${escapeHtml(glyph)}</span></span>`
+  );
 }
 
 function colorLabelPt(color: PlayerColor): string {
