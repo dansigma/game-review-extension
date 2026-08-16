@@ -30,6 +30,8 @@ export {
   moveAccuracy,
   trimmedMean,
 } from "./accuracy.ts";
+export { buildCommentSlice } from "./commentSlice.ts";
+export type { CommentSlice } from "./commentSlice.ts";
 export { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
 export {
   CRITICAL_EPL_MIN,

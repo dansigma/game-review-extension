@@ -1,4 +1,5 @@
 import {
+  buildCommentSlice,
   isOnlyMove,
   MOVE_CLASS_LABEL_PT,
   selectCriticalMoments,
@@ -50,6 +51,10 @@ export interface GameReviewPanelElements {
   plyLabel: HTMLElement;
   criticalMomentsBlock: HTMLElement;
   criticalMomentsList: HTMLElement;
+  commentSliceBlock: HTMLElement;
+  commentSliceEmpty: HTMLElement;
+  commentSliceBody: HTMLElement;
+  commentSliceButton: HTMLButtonElement;
 }
 
 export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements {
@@ -99,6 +104,11 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     throw new Error("Missing #nav-end");
   }
 
+  const commentSliceButton = root.querySelector("#comment-slice-button");
+  if (!(commentSliceButton instanceof HTMLButtonElement)) {
+    throw new Error("Missing #comment-slice-button");
+  }
+
   const evalCanvas = root.querySelector("#eval-graph");
   if (!(evalCanvas instanceof HTMLCanvasElement)) {
     throw new Error("Missing #eval-graph");
@@ -126,6 +136,10 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     plyLabel: requireEl("#ply-label"),
     criticalMomentsBlock: requireEl("#critical-moments"),
     criticalMomentsList: requireEl("#critical-moments-list"),
+    commentSliceBlock: requireEl("#comment-slice"),
+    commentSliceEmpty: requireEl("#comment-slice-empty"),
+    commentSliceBody: requireEl("#comment-slice-body"),
+    commentSliceButton,
   };
 }
 
@@ -371,7 +385,69 @@ export class GameReviewPanel {
       renderEvalGraph(this.el.evalCanvas, this.review.graph, this.currentPly);
     }
     this.updateNav();
+    this.renderCommentSlice();
     this.highlightActiveMove();
+  }
+
+  private renderCommentSlice(): void {
+    const { commentSliceEmpty, commentSliceBody, commentSliceButton } = this.el;
+
+    if (!this.review || this.currentPly < 0) {
+      commentSliceEmpty.hidden = false;
+      commentSliceEmpty.textContent = "Selecione um lance";
+      commentSliceBody.hidden = true;
+      commentSliceBody.replaceChildren();
+      commentSliceButton.disabled = true;
+      return;
+    }
+
+    const slice = buildCommentSlice(this.review, this.currentPly);
+    if (!slice) {
+      commentSliceEmpty.hidden = false;
+      commentSliceEmpty.textContent = "Selecione um lance";
+      commentSliceBody.hidden = true;
+      commentSliceBody.replaceChildren();
+      commentSliceButton.disabled = true;
+      return;
+    }
+
+    commentSliceEmpty.hidden = true;
+    commentSliceBody.hidden = false;
+    commentSliceBody.replaceChildren();
+
+    const winSwing =
+      slice.playerWinPercentBefore - slice.playerWinPercentAfter;
+    const accuracyLabel =
+      slice.accuracy === null
+        ? "—"
+        : `${slice.accuracy.toFixed(1)}%`;
+    const bestLabel = slice.playedIsBest ? "Melhor lance" : "Não é o melhor";
+    const onlyMoveLabel = slice.onlyMove ? " · Lance único" : "";
+
+    commentSliceBody.innerHTML = [
+      `<div class="comment-slice-line">` +
+        `<span class="comment-slice-san">${escapeHtml(formatMoveRef(slice.ply, slice.color, slice.san))}</span>` +
+        `<span>${escapeHtml(MOVE_CLASS_LABEL_PT[slice.classification])}</span>` +
+        `</div>`,
+      `<div class="comment-slice-line">` +
+        `<span class="comment-slice-muted">EPL</span>` +
+        `<span>${slice.epl.toFixed(2)}</span>` +
+        `</div>`,
+      `<div class="comment-slice-line">` +
+        `<span class="comment-slice-muted">Win%</span>` +
+        `<span>${formatWinPercent(slice.playerWinPercentBefore)} → ${formatWinPercent(slice.playerWinPercentAfter)} (${formatWinSwing(winSwing)})</span>` +
+        `</div>`,
+      `<div class="comment-slice-line">` +
+        `<span class="comment-slice-muted">Precisão</span>` +
+        `<span>${escapeHtml(accuracyLabel)}</span>` +
+        `</div>`,
+      `<div class="comment-slice-line">` +
+        `<span class="comment-slice-muted">Motor</span>` +
+        `<span>${escapeHtml(bestLabel)}${escapeHtml(onlyMoveLabel)}</span>` +
+        `</div>`,
+    ].join("");
+
+    commentSliceButton.disabled = true;
   }
 
   private highlightActiveMove(): void {
@@ -468,6 +544,10 @@ function formatWinSwing(swing: number): string {
     return `+${Math.abs(rounded)}% win`;
   }
   return "0% win";
+}
+
+function formatWinPercent(value: number): string {
+  return `${Math.round(value)}%`;
 }
 
 function formatResult(result: string): string {
