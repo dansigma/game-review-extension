@@ -32,4 +32,10 @@ describe("isSacrifice", () => {
   it("returns false for illegal UCI", () => {
     expect(isSacrifice(START, "e2e5")).toBe(false);
   });
+
+  it("returns false for a quiet pawn move when another piece was already hanging", () => {
+    const fen =
+      "rnbqkbnr/ppp1pppp/8/3q4/8/2N5/P1PPPPPP/RNBQKBNR w KQkq - 0 1";
+    expect(isSacrifice(fen, "a2a3")).toBe(false);
+  });
 });
