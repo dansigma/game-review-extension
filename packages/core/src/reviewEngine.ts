@@ -113,12 +113,12 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
   if (!start) {
     throw new ReviewEngineError("Missing eval for the starting position");
   }
+  const startStm = sideToMoveFromFen(start.fen);
+  const startBest = bestLine(start);
   graph.push({
     ply: -1,
-    whiteWinPercent: whiteWinPercent(
-      bestLine(start).score,
-      sideToMoveFromFen(start.fen),
-    ),
+    whiteWinPercent: whiteWinPercent(startBest.score, startStm),
+    whiteScore: whiteScore(startBest.score, startStm),
   });
 
   for (let i = 0; i < game.moves.length; i += 1) {
@@ -177,6 +177,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
     graph.push({
       ply: move.ply,
       whiteWinPercent: whiteWinPercent(afterBest.score, afterStm),
+      whiteScore: whiteScore(afterBest.score, afterStm),
     });
   }
 

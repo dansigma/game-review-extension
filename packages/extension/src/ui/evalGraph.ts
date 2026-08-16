@@ -1,4 +1,10 @@
-import type { EvalGraphPoint } from "@game-review/core";
+import {
+  clampGraphPawns,
+  GRAPH_PAWN_CAP,
+  graphPawns,
+  graphYFraction,
+  type EvalGraphPoint,
+} from "@game-review/core";
 
 const LINE = "#629924";
 const FILL = "rgba(98, 153, 36, 0.15)";
@@ -6,6 +12,10 @@ const GRID = "#444";
 const MIDLINE = "#666";
 const CURSOR = "#f0ece4";
 const LABEL = "#9e9a91";
+
+function yAtPawns(padY: number, innerH: number, pawns: number): number {
+  return padY + innerH * (1 - graphYFraction(clampGraphPawns(pawns)));
+}
 
 export function renderEvalGraph(
   canvas: HTMLCanvasElement,
@@ -35,8 +45,8 @@ export function renderEvalGraph(
 
   ctx.strokeStyle = GRID;
   ctx.lineWidth = 1;
-  for (const pct of [25, 50, 75]) {
-    const y = padY + innerH * (1 - pct / 100);
+  for (const pawns of [2, -2]) {
+    const y = yAtPawns(padY, innerH, pawns);
     ctx.beginPath();
     ctx.moveTo(padX, y);
     ctx.lineTo(padX + innerW, y);
@@ -44,33 +54,34 @@ export function renderEvalGraph(
   }
 
   ctx.strokeStyle = MIDLINE;
-  ctx.setLineDash([4, 4]);
-  const midY = padY + innerH / 2;
+  const midY = yAtPawns(padY, innerH, 0);
   ctx.beginPath();
   ctx.moveTo(padX, midY);
   ctx.lineTo(padX + innerW, midY);
   ctx.stroke();
-  ctx.setLineDash([]);
 
   const maxPly = Math.max(...points.map((p) => p.ply), 1);
   const xAt = (ply: number): number => padX + ((ply + 1) / (maxPly + 1)) * innerW;
-  const yAt = (wp: number): number => padY + innerH * (1 - wp / 100);
+  const yAt = (point: EvalGraphPoint): number =>
+    yAtPawns(padY, innerH, graphPawns(point));
+
+  const bottomY = padY + innerH;
 
   ctx.beginPath();
-  ctx.moveTo(xAt(points[0]?.ply ?? -1), yAt(points[0]?.whiteWinPercent ?? 50));
+  ctx.moveTo(xAt(points[0]?.ply ?? -1), yAt(points[0] ?? { ply: -1, whiteWinPercent: 50 }));
   for (const point of points) {
-    ctx.lineTo(xAt(point.ply), yAt(point.whiteWinPercent));
+    ctx.lineTo(xAt(point.ply), yAt(point));
   }
-  ctx.lineTo(xAt(points[points.length - 1]?.ply ?? 0), padY + innerH);
-  ctx.lineTo(xAt(points[0]?.ply ?? -1), padY + innerH);
+  ctx.lineTo(xAt(points[points.length - 1]?.ply ?? 0), bottomY);
+  ctx.lineTo(xAt(points[0]?.ply ?? -1), bottomY);
   ctx.closePath();
   ctx.fillStyle = FILL;
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(xAt(points[0]?.ply ?? -1), yAt(points[0]?.whiteWinPercent ?? 50));
+  ctx.moveTo(xAt(points[0]?.ply ?? -1), yAt(points[0] ?? { ply: -1, whiteWinPercent: 50 }));
   for (const point of points) {
-    ctx.lineTo(xAt(point.ply), yAt(point.whiteWinPercent));
+    ctx.lineTo(xAt(point.ply), yAt(point));
   }
   ctx.strokeStyle = LINE;
   ctx.lineWidth = 2;
@@ -87,7 +98,6 @@ export function renderEvalGraph(
   ctx.fillStyle = LABEL;
   ctx.font = "10px system-ui, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("Brancas", padX, padY - 1);
-  ctx.textAlign = "right";
-  ctx.fillText("Pretas", padX + innerW, height - 1);
+  ctx.fillText(`+${GRAPH_PAWN_CAP}`, padX, padY + 8);
+  ctx.fillText(`-${GRAPH_PAWN_CAP}`, padX, padY + innerH - 2);
 }

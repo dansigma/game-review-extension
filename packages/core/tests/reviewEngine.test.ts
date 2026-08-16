@@ -316,4 +316,47 @@ describe("reviewGame on PGN fixtures", () => {
       whiteScore({ type: "cp", value: 220 }, "black"),
     );
   });
+
+  it("stores whiteScore on every graph point alongside whiteWinPercent", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    expect(firstMove).toBeDefined();
+
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: 50 }, "e2e4"),
+          line(2, { type: "cp", value: 30 }, "d2d4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: 220 }, "e7e5"),
+          line(2, { type: "cp", value: 100 }, "c7c5"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 1) },
+      evals,
+      engineId: "sf_18",
+    });
+
+    expect(review.graph).toHaveLength(2);
+    expect(review.graph[0]).toMatchObject({
+      ply: -1,
+      whiteScore: { type: "cp", value: 50 },
+    });
+    expect(review.graph[0]?.whiteWinPercent).toBeGreaterThan(0);
+    expect(review.graph[1]).toMatchObject({
+      ply: 0,
+      whiteScore: { type: "cp", value: -220 },
+    });
+    expect(review.graph[1]?.whiteWinPercent).toBeGreaterThan(0);
+  });
 });

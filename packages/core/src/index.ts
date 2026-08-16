@@ -73,6 +73,13 @@ export {
   whiteScore,
 } from "./evalDisplay.ts";
 export {
+  clampGraphPawns,
+  GRAPH_PAWN_CAP,
+  graphPawns,
+  graphYFraction,
+  pawnsFromWhiteScore,
+} from "./evalGraphScale.ts";
+export {
   clamp,
   expectedPointsLost,
   mateToCentipawns,

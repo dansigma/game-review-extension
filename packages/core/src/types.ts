@@ -118,6 +118,8 @@ export interface ReviewedMove {
 export interface EvalGraphPoint {
   ply: number;
   whiteWinPercent: number;
+  /** PV1 flipped to White's POV; omitted in legacy cached reviews. */
+  whiteScore?: EngineScore;
 }
 
 export interface PlayerAccuracy {
