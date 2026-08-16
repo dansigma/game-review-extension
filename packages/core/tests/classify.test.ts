@@ -57,7 +57,49 @@ describe("classifyMove", () => {
     ).toBe("blunder");
   });
 
-  it("classifies Brilliant on sacrifice with best quality", () => {
+  it("classifies Brilliant on sacrifice with best quality and win% impact", () => {
+    expect(
+      classifyMove(
+        baseArgs({
+          playedIsBest: true,
+          isSacrifice: true,
+          playerWinPercentBefore: 50,
+          playerWinPercentAfter: 62,
+          isOnlyMove: false,
+        }),
+      ),
+    ).toBe("brilliant");
+  });
+
+  it("classifies Brilliant on sacrifice with decisive win% after", () => {
+    expect(
+      classifyMove(
+        baseArgs({
+          playedIsBest: true,
+          isSacrifice: true,
+          playerWinPercentBefore: 60,
+          playerWinPercentAfter: 86,
+          isOnlyMove: false,
+        }),
+      ),
+    ).toBe("brilliant");
+  });
+
+  it("does not classify Brilliant when sacrifice has no win% impact", () => {
+    expect(
+      classifyMove(
+        baseArgs({
+          playedIsBest: true,
+          isSacrifice: true,
+          playerWinPercentBefore: 50,
+          playerWinPercentAfter: 50,
+          isOnlyMove: false,
+        }),
+      ),
+    ).toBe("best");
+  });
+
+  it("does not classify Brilliant when sacrifice drops win%", () => {
     expect(
       classifyMove(
         baseArgs({
@@ -68,17 +110,31 @@ describe("classifyMove", () => {
           isOnlyMove: false,
         }),
       ),
-    ).toBe("brilliant");
+    ).toBe("best");
   });
 
-  it("blocks Brilliant when sacrifice is the only good move", () => {
+  it("classifies Brilliant on only-move sacrifice with decisive win% after", () => {
     expect(
       classifyMove(
         baseArgs({
           playedIsBest: true,
           isSacrifice: true,
           playerWinPercentBefore: 60,
-          playerWinPercentAfter: 40,
+          playerWinPercentAfter: 86,
+          isOnlyMove: true,
+        }),
+      ),
+    ).toBe("brilliant");
+  });
+
+  it("classifies Great on only-move sacrifice without win% impact", () => {
+    expect(
+      classifyMove(
+        baseArgs({
+          playedIsBest: true,
+          isSacrifice: true,
+          playerWinPercentBefore: 50,
+          playerWinPercentAfter: 50,
           isOnlyMove: true,
         }),
       ),

@@ -113,9 +113,31 @@ function qsearch(fen: string, depth: number, budget: QSearchBudget): number {
   return best;
 }
 
+function flipSideToMove(fen: string): string | null {
+  const parts = fen.split(" ");
+  if (parts.length < 2) {
+    return null;
+  }
+  const stm = parts[1];
+  if (stm !== "w" && stm !== "b") {
+    return null;
+  }
+  parts[1] = stm === "w" ? "b" : "w";
+  if (parts.length >= 4) {
+    parts[3] = "-";
+  }
+  const flipped = parts.join(" ");
+  try {
+    new Chess(flipped);
+    return flipped;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Sacrifice when static material before the move exceeds post-capture standing
- * by more than {@link SACRIFICE_CP_DROP} (capture-only quiescence after the ply).
+ * Sacrifice when the move causes new hanging material: tactical standing before
+ * the ply (opponent to move) minus standing after exceeds {@link SACRIFICE_CP_DROP}.
  */
 export function isSacrifice(fenBefore: string, uci: string): boolean {
   try {
@@ -129,9 +151,12 @@ export function isSacrifice(fenBefore: string, uci: string): boolean {
       return false;
     }
 
-    const before = staticMaterial(fenBefore, mover);
-    const after = -evalAfterCaptures(chess.fen());
-    return before - after > SACRIFICE_CP_DROP;
+    const standingAfter = -evalAfterCaptures(chess.fen());
+    const flippedFen = flipSideToMove(fenBefore);
+    const standingBefore = flippedFen
+      ? -evalAfterCaptures(flippedFen)
+      : staticMaterial(fenBefore, mover);
+    return standingBefore - standingAfter > SACRIFICE_CP_DROP;
   } catch {
     return false;
   }
