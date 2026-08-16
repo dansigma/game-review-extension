@@ -24,8 +24,16 @@ export function isDarkSquare(file: number, chessRank: number): boolean {
   return (file + chessRank) % 2 === 0;
 }
 
-export function displayYForRank(chessRank: number, cell: number): number {
-  return (7 - chessRank) * cell;
+export function displayYForRank(
+  chessRank: number,
+  cell: number,
+  flipped = false,
+): number {
+  return flipped ? chessRank * cell : (7 - chessRank) * cell;
+}
+
+export function displayXForFile(file: number, cell: number, flipped = false): number {
+  return flipped ? (7 - file) * cell : file * cell;
 }
 
 function squareColor(file: number, chessRank: number): string {
@@ -74,13 +82,16 @@ function appendPiece(
   parent.appendChild(nested);
 }
 
-function appendCoordinates(svg: SVGElement, cell: number): void {
+function appendCoordinates(svg: SVGElement, cell: number, flipped = false): void {
   const font = Math.max(8, cell * 0.18);
+  const bottomRank = flipped ? 7 : 0;
+  const leftFile = flipped ? 7 : 0;
+
   for (let file = 0; file < 8; file += 1) {
     const label = svgEl("text");
-    const onDark = isDarkSquare(file, 0);
-    label.setAttribute("x", String(file * cell + cell * 0.08));
-    label.setAttribute("y", String(displayYForRank(0, cell) + cell * 0.92));
+    const onDark = isDarkSquare(file, bottomRank);
+    label.setAttribute("x", String(displayXForFile(file, cell, flipped) + cell * 0.08));
+    label.setAttribute("y", String(displayYForRank(bottomRank, cell, flipped) + cell * 0.92));
     label.setAttribute("fill", onDark ? COORD_ON_DARK : COORD_ON_LIGHT);
     label.setAttribute("font-size", String(font));
     label.setAttribute("font-family", "system-ui, Segoe UI, sans-serif");
@@ -90,9 +101,9 @@ function appendCoordinates(svg: SVGElement, cell: number): void {
   }
   for (let rank = 0; rank < 8; rank += 1) {
     const label = svgEl("text");
-    const onDark = isDarkSquare(0, rank);
-    label.setAttribute("x", String(cell * 0.08));
-    label.setAttribute("y", String(displayYForRank(rank, cell) + cell * 0.22));
+    const onDark = isDarkSquare(leftFile, rank);
+    label.setAttribute("x", String(displayXForFile(leftFile, cell, flipped) + cell * 0.08));
+    label.setAttribute("y", String(displayYForRank(rank, cell, flipped) + cell * 0.22));
     label.setAttribute("fill", onDark ? COORD_ON_DARK : COORD_ON_LIGHT);
     label.setAttribute("font-size", String(font));
     label.setAttribute("font-family", "system-ui, Segoe UI, sans-serif");
@@ -121,6 +132,7 @@ export function renderChessBoard(
   container: HTMLElement,
   fen: string,
   highlight: BoardHighlight = {},
+  flipped = false,
 ): void {
   const chess = new Chess(fen);
   const board = chess.board();
@@ -137,8 +149,8 @@ export function renderChessBoard(
   for (let rank = 7; rank >= 0; rank -= 1) {
     for (let file = 0; file < 8; file += 1) {
       const rect = svgEl("rect");
-      rect.setAttribute("x", String(file * cell));
-      rect.setAttribute("y", String(displayYForRank(rank, cell)));
+      rect.setAttribute("x", String(displayXForFile(file, cell, flipped)));
+      rect.setAttribute("y", String(displayYForRank(rank, cell, flipped)));
       rect.setAttribute("width", String(cell));
       rect.setAttribute("height", String(cell));
       rect.setAttribute("fill", squareColor(file, rank));
@@ -153,15 +165,15 @@ export function renderChessBoard(
       continue;
     }
     const rect = svgEl("rect");
-    rect.setAttribute("x", String(sq.file * cell));
-    rect.setAttribute("y", String(displayYForRank(sq.rank, cell)));
+    rect.setAttribute("x", String(displayXForFile(sq.file, cell, flipped)));
+    rect.setAttribute("y", String(displayYForRank(sq.rank, cell, flipped)));
     rect.setAttribute("width", String(cell));
     rect.setAttribute("height", String(cell));
     rect.setAttribute("fill", LAST_MOVE);
     svg.appendChild(rect);
   }
 
-  appendCoordinates(svg, cell);
+  appendCoordinates(svg, cell, flipped);
 
   for (let rank = 7; rank >= 0; rank -= 1) {
     for (let file = 0; file < 8; file += 1) {
@@ -173,8 +185,8 @@ export function renderChessBoard(
         svg,
         piece.type as PieceType,
         piece.color,
-        file * cell,
-        displayYForRank(rank, cell),
+        displayXForFile(file, cell, flipped),
+        displayYForRank(rank, cell, flipped),
         cell,
       );
     }

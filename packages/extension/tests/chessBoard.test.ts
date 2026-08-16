@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CBURNETT_SVG } from "../src/ui/chessPieces.ts";
 import {
   boardRowForRank,
+  displayXForFile,
   displayYForRank,
   fenAtPly,
   isDarkSquare,
@@ -53,6 +54,24 @@ describe("displayYForRank", () => {
 
   it("places 8th rank at the top", () => {
     expect(displayYForRank(7, 35)).toBe(0);
+  });
+
+  it("flipped places 1st rank at the top", () => {
+    expect(displayYForRank(0, 35, true)).toBe(0);
+  });
+
+  it("flipped places 8th rank at the bottom", () => {
+    expect(displayYForRank(7, 35, true)).toBe(245);
+  });
+});
+
+describe("displayXForFile", () => {
+  it("places file a on the left when unflipped", () => {
+    expect(displayXForFile(0, 35)).toBe(0);
+  });
+
+  it("places file a on the right when flipped", () => {
+    expect(displayXForFile(0, 35, true)).toBe(245);
   });
 });
 

@@ -58,6 +58,7 @@ export interface GameReviewPanelElements {
   navNext: HTMLButtonElement;
   navStart: HTMLButtonElement;
   navEnd: HTMLButtonElement;
+  boardFlip: HTMLButtonElement;
   plyLabel: HTMLElement;
   criticalMomentsBlock: HTMLElement;
   criticalMomentsList: HTMLElement;
@@ -85,6 +86,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
   const navNext = root.querySelector("#nav-next");
   const navStart = root.querySelector("#nav-start");
   const navEnd = root.querySelector("#nav-end");
+  const boardFlip = root.querySelector("#board-flip");
 
   if (!(presetSelect instanceof HTMLSelectElement)) {
     throw new Error("Missing #engine-quality-preset");
@@ -112,6 +114,9 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
   }
   if (!(navEnd instanceof HTMLButtonElement)) {
     throw new Error("Missing #nav-end");
+  }
+  if (!(boardFlip instanceof HTMLButtonElement)) {
+    throw new Error("Missing #board-flip");
   }
 
   const commentSliceButton = root.querySelector("#comment-slice-button");
@@ -144,6 +149,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     navNext,
     navStart,
     navEnd,
+    boardFlip,
     plyLabel: requireEl("#ply-label"),
     criticalMomentsBlock: requireEl("#critical-moments"),
     criticalMomentsList: requireEl("#critical-moments-list"),
@@ -174,6 +180,7 @@ export class GameReviewPanel {
   private game: NormalizedGame | null = null;
   private review: GameReview | null = null;
   private currentPly = -1;
+  private flipped = false;
   private classPlies = new Map<string, number[]>();
   private judgementCycleIndex = new Map<string, number>();
   private onAnalyze: (() => void) | null = null;
@@ -194,6 +201,7 @@ export class GameReviewPanel {
       const max = (this.game?.moves.length ?? 1) - 1;
       this.goToPly(max);
     });
+    el.boardFlip.addEventListener("click", () => this.toggleBoardFlip());
     el.evalCanvas.addEventListener("click", (event) => this.onGraphClick(event));
     window.addEventListener("resize", () => this.refreshView());
   }
@@ -490,6 +498,12 @@ export class GameReviewPanel {
     return td;
   }
 
+  private toggleBoardFlip(): void {
+    this.flipped = !this.flipped;
+    this.el.boardFlip.setAttribute("aria-pressed", String(this.flipped));
+    this.refreshView();
+  }
+
   private refreshView(): void {
     if (!this.game) {
       return;
@@ -499,7 +513,7 @@ export class GameReviewPanel {
     const move =
       this.currentPly >= 0 ? this.game.moves[this.currentPly] : undefined;
     const highlight = move ? uciSquares(move.uci) : null;
-    renderChessBoard(this.el.boardHost, fen, highlight ?? undefined);
+    renderChessBoard(this.el.boardHost, fen, highlight ?? undefined, this.flipped);
     if (this.review) {
       renderEvalGraph(this.el.evalCanvas, this.review.graph, this.currentPly);
     }
