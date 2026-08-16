@@ -162,10 +162,72 @@
       .review-summary p {
         margin: 0;
       }
-      .review-summary .accuracy,
-      .review-summary .judgements {
+      .review-summary .accuracy {
         color: var(--accent);
         font-weight: 600;
+      }
+      .review-summary .judgements {
+        margin-top: 6px;
+      }
+      .class-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .class-dashboard-row {
+        display: grid;
+        grid-template-columns: 2.5em 1.6em 1fr 2.5em;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+      }
+      .class-dashboard-count {
+        min-width: 0;
+        padding: 2px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        border: 1px solid #333;
+        border-radius: 3px;
+        background: #1a1917;
+      }
+      .class-dashboard-count:disabled {
+        opacity: 0.35;
+      }
+      .class-dashboard-glyph {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.4em;
+        height: 1.4em;
+        border-radius: 50%;
+        border: 1px solid currentColor;
+        font-size: 10px;
+        line-height: 1;
+      }
+      .class-dashboard-label {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .class-dashboard-row.move-best .class-dashboard-count,
+      .class-dashboard-row.move-best .class-dashboard-glyph {
+        color: var(--move-best);
+      }
+      .class-dashboard-row.move-good .class-dashboard-count,
+      .class-dashboard-row.move-good .class-dashboard-glyph {
+        color: var(--move-good);
+      }
+      .class-dashboard-row.move-inaccuracy .class-dashboard-count,
+      .class-dashboard-row.move-inaccuracy .class-dashboard-glyph {
+        color: var(--move-inaccuracy);
+      }
+      .class-dashboard-row.move-mistake .class-dashboard-count,
+      .class-dashboard-row.move-mistake .class-dashboard-glyph {
+        color: var(--move-mistake);
+      }
+      .class-dashboard-row.move-blunder .class-dashboard-count,
+      .class-dashboard-row.move-blunder .class-dashboard-glyph {
+        color: var(--move-blunder);
       }
       #move-list {
         width: 100%;
@@ -473,7 +535,7 @@
           <div class="review-summary">
             <p id="review-summary-result"></p>
             <p id="review-summary-accuracy" class="accuracy"></p>
-            <p id="review-summary-judgements" class="judgements"></p>
+            <div id="review-summary-judgements" class="judgements class-dashboard"></div>
           </div>
           <div id="board-host" aria-label="Tabuleiro"></div>
           <canvas id="eval-graph" aria-label="Gráfico de avaliação"></canvas>

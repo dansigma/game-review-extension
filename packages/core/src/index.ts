@@ -46,6 +46,7 @@ export {
 export type { JudgementCommentArgs } from "./nag.ts";
 export {
   CRITICAL_EPL_MIN,
+  DASHBOARD_CLASSES,
   countJudgements,
   selectCriticalMoments,
 } from "./criticalMoments.ts";

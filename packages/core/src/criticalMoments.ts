@@ -13,6 +13,23 @@ const CRITICAL_CLASSIFICATIONS = new Set<MoveClass>([
   "blunder",
 ]);
 
+const DASHBOARD_CLASSIFICATIONS = new Set<MoveClass>([
+  "best",
+  "good",
+  "inaccuracy",
+  "mistake",
+  "blunder",
+]);
+
+/** Dashboard row order: positive → negative. Forced is excluded. */
+export const DASHBOARD_CLASSES: (keyof JudgementCounts)[] = [
+  "best",
+  "good",
+  "inaccuracy",
+  "mistake",
+  "blunder",
+];
+
 export interface CriticalMoment {
   ply: number;
   color: PlayerColor;
@@ -25,6 +42,8 @@ export interface CriticalMoment {
 }
 
 export interface JudgementCounts {
+  best: number;
+  good: number;
   inaccuracy: number;
   mistake: number;
   blunder: number;
@@ -33,6 +52,8 @@ export interface JudgementCounts {
 export type JudgementsByColor = Record<PlayerColor, JudgementCounts>;
 
 const EMPTY_JUDGEMENTS: JudgementCounts = {
+  best: 0,
+  good: 0,
   inaccuracy: 0,
   mistake: 0,
   blunder: 0,
@@ -44,6 +65,12 @@ function isCriticalClassification(
   return CRITICAL_CLASSIFICATIONS.has(classification);
 }
 
+function isDashboardClassification(
+  classification: MoveClass,
+): classification is keyof JudgementCounts {
+  return DASHBOARD_CLASSIFICATIONS.has(classification);
+}
+
 export function countJudgements(
   moves: readonly ReviewedMove[],
 ): JudgementsByColor {
@@ -53,7 +80,7 @@ export function countJudgements(
   };
 
   for (const move of moves) {
-    if (!isCriticalClassification(move.classification)) {
+    if (!isDashboardClassification(move.classification)) {
       continue;
     }
     counts[move.color][move.classification] += 1;

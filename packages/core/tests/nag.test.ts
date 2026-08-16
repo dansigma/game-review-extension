@@ -17,7 +17,7 @@ const ALL_CLASSES: MoveClass[] = [
 
 describe("classificationGlyph", () => {
   it("maps all move classes to NAG glyphs", () => {
-    expect(classificationGlyph("best")).toBe("!!");
+    expect(classificationGlyph("best")).toBe("★");
     expect(classificationGlyph("good")).toBe("!");
     expect(classificationGlyph("inaccuracy")).toBe("?!");
     expect(classificationGlyph("mistake")).toBe("?");
@@ -25,8 +25,9 @@ describe("classificationGlyph", () => {
     expect(classificationGlyph("forced")).toBe("");
   });
 
-  it("covers every MoveClass", () => {
+  it("never uses !! as a glyph", () => {
     for (const moveClass of ALL_CLASSES) {
+      expect(classificationGlyph(moveClass)).not.toBe("!!");
       expect(typeof classificationGlyph(moveClass)).toBe("string");
     }
   });
@@ -36,7 +37,7 @@ describe("formatSanWithGlyph", () => {
   it("appends the glyph after SAN", () => {
     expect(formatSanWithGlyph("Be2", "inaccuracy")).toBe("Be2?!");
     expect(formatSanWithGlyph("Nf3", "good")).toBe("Nf3!");
-    expect(formatSanWithGlyph("Qxf7#", "best")).toBe("Qxf7#!!");
+    expect(formatSanWithGlyph("Qxf7#", "best")).toBe("Qxf7#★");
   });
 
   it("leaves forced moves without a glyph suffix", () => {

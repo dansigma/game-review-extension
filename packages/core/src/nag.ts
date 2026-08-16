@@ -1,7 +1,7 @@
 import type { MoveClass } from "./types.ts";
 
 const CLASSIFICATION_GLYPH: Record<MoveClass, string> = {
-  best: "!!",
+  best: "★",
   good: "!",
   inaccuracy: "?!",
   mistake: "?",
