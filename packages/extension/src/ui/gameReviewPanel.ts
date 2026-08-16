@@ -14,6 +14,7 @@ import {
   DEFAULT_ENGINE_PRESET,
   isEngineQualityPresetId,
   nodesForPreset,
+  presetSelectLabel,
   type EngineQualityPresetId,
 } from "../budgetDecision.ts";
 import { formatAnalysisProgressLabel } from "../analysisEta.ts";
@@ -143,6 +144,22 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
   };
 }
 
+const PRESET_IDS: EngineQualityPresetId[] = ["fast", "standard", "deep"];
+
+function fillPresetSelect(select: HTMLSelectElement): void {
+  const selected = isEngineQualityPresetId(select.value)
+    ? select.value
+    : DEFAULT_ENGINE_PRESET;
+  select.replaceChildren();
+  for (const id of PRESET_IDS) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = presetSelectLabel(id);
+    option.selected = id === selected;
+    select.append(option);
+  }
+}
+
 export class GameReviewPanel {
   private game: NormalizedGame | null = null;
   private review: GameReview | null = null;
@@ -153,6 +170,7 @@ export class GameReviewPanel {
   private onPresetChange: (() => void) | null = null;
 
   constructor(private readonly el: GameReviewPanelElements) {
+    fillPresetSelect(el.presetSelect);
     el.analyzeButton.addEventListener("click", () => this.onAnalyze?.());
     el.reanalyzeButton.addEventListener("click", () => this.onReanalyze?.());
     el.cancelButton.addEventListener("click", () => this.onCancel?.());

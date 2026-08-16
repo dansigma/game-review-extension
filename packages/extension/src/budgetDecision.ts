@@ -33,6 +33,25 @@ export function nodesForPreset(presetId: EngineQualityPresetId): number {
   return ENGINE_QUALITY_PRESETS[presetId].nodes;
 }
 
+/** Compact PT node count for UI: 80k, 400k, 1,5M. */
+export function formatNodesLabel(nodes: number): string {
+  if (nodes >= 1_000_000) {
+    const millions = nodes / 1_000_000;
+    const text =
+      Number.isInteger(millions) ? String(millions) : millions.toFixed(1).replace(".", ",");
+    return `${text}M`;
+  }
+  if (nodes >= 1_000) {
+    return `${Math.round(nodes / 1_000)}k`;
+  }
+  return String(nodes);
+}
+
+export function presetSelectLabel(presetId: EngineQualityPresetId): string {
+  const preset = ENGINE_QUALITY_PRESETS[presetId];
+  return `${preset.labelPt} (${formatNodesLabel(preset.nodes)})`;
+}
+
 export function isEngineQualityPresetId(
   value: string,
 ): value is EngineQualityPresetId {
