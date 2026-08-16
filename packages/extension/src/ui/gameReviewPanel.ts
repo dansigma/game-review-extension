@@ -28,6 +28,10 @@ import {
 import { formatAnalysisProgressLabel } from "../analysisEta.ts";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
 import { renderEvalGraph } from "./evalGraph.ts";
+import {
+  moveListRows,
+  type MoveListFilter,
+} from "./moveListRows.ts";
 
 const CLASS_CSS: Record<MoveClass, string> = {
   best: "move-best",
@@ -66,6 +70,9 @@ export interface GameReviewPanelElements {
   commentSliceEmpty: HTMLElement;
   commentSliceBody: HTMLElement;
   commentSliceButton: HTMLButtonElement;
+  moveListFilterToolbar: HTMLElement;
+  moveListFilterLabel: HTMLElement;
+  moveListClearFilter: HTMLButtonElement;
 }
 
 export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements {
@@ -124,6 +131,11 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     throw new Error("Missing #comment-slice-button");
   }
 
+  const moveListClearFilter = root.querySelector("#move-list-clear-filter");
+  if (!(moveListClearFilter instanceof HTMLButtonElement)) {
+    throw new Error("Missing #move-list-clear-filter");
+  }
+
   const evalCanvas = root.querySelector("#eval-graph");
   if (!(evalCanvas instanceof HTMLCanvasElement)) {
     throw new Error("Missing #eval-graph");
@@ -157,6 +169,9 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     commentSliceEmpty: requireEl("#comment-slice-empty"),
     commentSliceBody: requireEl("#comment-slice-body"),
     commentSliceButton,
+    moveListFilterToolbar: requireEl("#move-list-filter-toolbar"),
+    moveListFilterLabel: requireEl("#move-list-filter-label"),
+    moveListClearFilter,
   };
 }
 
@@ -183,6 +198,7 @@ export class GameReviewPanel {
   private flipped = false;
   private classPlies = new Map<string, number[]>();
   private judgementCycleIndex = new Map<string, number>();
+  private moveListFilter: MoveListFilter = null;
   private onAnalyze: (() => void) | null = null;
   private onReanalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
@@ -202,6 +218,7 @@ export class GameReviewPanel {
       this.goToPly(max);
     });
     el.boardFlip.addEventListener("click", () => this.toggleBoardFlip());
+    el.moveListClearFilter.addEventListener("click", () => this.clearMoveListFilter());
     el.evalCanvas.addEventListener("click", (event) => this.onGraphClick(event));
     window.addEventListener("resize", () => this.refreshView());
   }
@@ -238,6 +255,7 @@ export class GameReviewPanel {
     this.game = game;
     this.review = null;
     this.currentPly = -1;
+    this.moveListFilter = null;
     if (!game) {
       this.el.reviewSection.hidden = true;
       return;
@@ -272,6 +290,7 @@ export class GameReviewPanel {
     this.review = review;
     this.game = game;
     this.currentPly = -1;
+    this.moveListFilter = null;
     this.judgementCycleIndex.clear();
     this.classPlies = buildClassPlies(review.moves);
     this.el.presetSelect.disabled = false;
@@ -282,6 +301,8 @@ export class GameReviewPanel {
     this.renderSummary();
     this.renderCriticalMoments();
     this.renderMoveList();
+    this.updateMoveListFilterToolbar();
+    this.updateDashboardPressedState();
     this.refreshView();
   }
 
@@ -365,6 +386,9 @@ export class GameReviewPanel {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `class-dashboard-count ${CLASS_CSS[classification]}`;
+    btn.dataset.color = color;
+    btn.dataset.classification = classification;
+    btn.setAttribute("aria-pressed", "false");
     btn.textContent = String(count);
     btn.disabled = count === 0;
     btn.setAttribute(
@@ -379,6 +403,7 @@ export class GameReviewPanel {
     color: PlayerColor,
     classification: keyof JudgementCounts,
   ): void {
+    this.moveListFilter = { color, classification };
     const key = classPliesKey(color, classification);
     const plies = this.classPlies.get(key) ?? [];
     if (plies.length === 0) {
@@ -391,6 +416,46 @@ export class GameReviewPanel {
     }
     this.goToPly(ply);
     this.judgementCycleIndex.set(key, (index + 1) % plies.length);
+    this.renderMoveList();
+    this.updateMoveListFilterToolbar();
+    this.updateDashboardPressedState();
+    this.highlightActiveMove();
+  }
+
+  private clearMoveListFilter(): void {
+    this.moveListFilter = null;
+    this.renderMoveList();
+    this.updateMoveListFilterToolbar();
+    this.updateDashboardPressedState();
+    this.highlightActiveMove();
+  }
+
+  private updateMoveListFilterToolbar(): void {
+    if (!this.moveListFilter) {
+      this.el.moveListFilterToolbar.hidden = true;
+      return;
+    }
+    const { color, classification } = this.moveListFilter;
+    this.el.moveListFilterToolbar.hidden = false;
+    this.el.moveListFilterLabel.textContent =
+      `${MOVE_CLASS_LABEL_PT[classification]} · ${colorLabelPt(color)}`;
+  }
+
+  private updateDashboardPressedState(): void {
+    for (const btn of Array.from(
+      this.el.summaryJudgements.querySelectorAll<HTMLButtonElement>(
+        ".class-dashboard-count",
+      ),
+    )) {
+      const color = btn.dataset.color;
+      const classification = btn.dataset.classification;
+      const pressed =
+        this.moveListFilter !== null &&
+        color === this.moveListFilter.color &&
+        classification === this.moveListFilter.classification;
+      btn.setAttribute("aria-pressed", String(pressed));
+      btn.classList.toggle("class-dashboard-count-active", pressed);
+    }
   }
 
   private renderCriticalMoments(): void {
@@ -452,7 +517,7 @@ export class GameReviewPanel {
       return;
     }
     const frag = document.createDocumentFragment();
-    const rows = pairMoves(this.review.moves);
+    const rows = moveListRows(this.review.moves, this.moveListFilter);
     for (const row of rows) {
       const tr = document.createElement("tr");
       tr.appendChild(this.moveCell(row.number, null, -1));
@@ -644,24 +709,6 @@ export class GameReviewPanel {
     const targetPly = Math.round(ratio * (maxPly + 1)) - 1;
     this.goToPly(targetPly);
   }
-}
-
-interface MoveRow {
-  number: number;
-  white: ReviewedMove | null;
-  black: ReviewedMove | null;
-}
-
-function pairMoves(moves: readonly ReviewedMove[]): MoveRow[] {
-  const rows: MoveRow[] = [];
-  for (let i = 0; i < moves.length; i += 2) {
-    rows.push({
-      number: Math.floor(i / 2) + 1,
-      white: moves[i] ?? null,
-      black: moves[i + 1] ?? null,
-    });
-  }
-  return rows;
 }
 
 function formatMoveRef(
