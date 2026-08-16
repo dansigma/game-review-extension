@@ -1,5 +1,5 @@
-/** Accuracy curve unchanged (Lichess lila); classification expanded in v2. */
-export const ALGO_VERSION = "lila-v2" as const;
+/** Accuracy curve unchanged (Lichess lila); sacrifice detector uses capture qsearch in v3. */
+export const ALGO_VERSION = "lila-v3" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
