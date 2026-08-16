@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * PoC 3 from Node: compare go depth 16 vs go nodes on sf_18_smallnet.
- * Same engine as the MV3 Side Panel; numbers feed the MVP budget decision.
+ * PoC 3 from Node: compare go depth 16 vs go nodes on sf_18 (full NNUE).
+ * Default MVP budget is now 400k nodes; this script still benchmarks 80k.
  */
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -12,7 +12,7 @@ import { Chess } from "chess.js";
 const require = createRequire(import.meta.url);
 const pkgDir = dirname(require.resolve("@lichess-org/stockfish-web/package.json"));
 const here = dirname(fileURLToPath(import.meta.url));
-const nnuePath = join(here, "..", "public", "engine", "nn-4ca89e4b3abf.nnue");
+const engineDir = join(here, "..", "public", "engine");
 
 const OPERA = `1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7
 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7
@@ -44,18 +44,19 @@ function parseInfo(line) {
 }
 
 async function createEngine() {
-  const mod = await import(pathToFileURL(join(pkgDir, "sf_18_smallnet.js")).href);
+  const mod = await import(pathToFileURL(join(pkgDir, "sf_18.js")).href);
   const engine = await mod.default({
     locateFile: (file) => join(pkgDir, file),
   });
-  const nnueName = engine.getRecommendedNnue(0);
-  const nnueFile = nnueName
-    ? join(dirname(nnuePath), nnueName)
-    : nnuePath;
-  try {
-    engine.setNnueBuffer(new Uint8Array(readFileSync(nnueFile)), 0);
-  } catch {
-    console.warn("NNUE not prefetched; engine may be weaker until copy-engine-assets runs.");
+  for (let index = 0; index < 2; index += 1) {
+    const nnueName = engine.getRecommendedNnue(index);
+    if (!nnueName) continue;
+    const nnueFile = join(engineDir, nnueName);
+    try {
+      engine.setNnueBuffer(new Uint8Array(readFileSync(nnueFile)), index);
+    } catch {
+      console.warn(`NNUE ${nnueName} not prefetched; run copy-engine-assets.`);
+    }
   }
   return engine;
 }

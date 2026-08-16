@@ -1,6 +1,6 @@
 # Game Review (extensão)
 
-Extensão Chrome MV3 para revisar partidas **depois que terminam**. Motor local: Stockfish 18 (`sf_18_smallnet`) via `@lichess-org/stockfish-web`. Licença do produto: **GPL-3.0-only** (Stockfish). O pacote `stockfish-web` é AGPL-3.0-or-later.
+Extensão Chrome MV3 para revisar partidas **depois que terminam**. Motor local: Stockfish 18 (`sf_18`, NNUE completo) via `@lichess-org/stockfish-web`. Licença do produto: **GPL-3.0-only** (Stockfish). O pacote `stockfish-web` é AGPL-3.0-or-later.
 
 Arquitetura travada em [SIG-651](https://linear.app/sigmalabs/issue/SIG-651). Este repositório não reabre essas decisões.
 
@@ -36,25 +36,25 @@ npm run build:extension
 Reabrir a mesma partida finalizada (Lichess ou PGN colado) não reexecuta o Stockfish se o cache acertar. A chave inclui:
 
 - `gameId`
-- `algoVersion` (`epl-v1`)
-- `engineId` (`sf_18_smallnet`)
-- `nodesPerPosition` (`80000`)
+- `algoVersion` (`lila-v1`)
+- `engineId` (`sf_18`)
+- `nodesPerPosition` (`400000`)
 
 Formato: `gameId|algoVersion|engineId|nodesPerPosition`. Mudar `ALGO_VERSION` invalida entradas antigas.
 
 ## Orçamento do motor (SIG-652)
 
-MVP: `go nodes 80000`, MultiPV=2, Threads=1, `sf_18_smallnet` no Side Panel.
-`go depth 16` é mais lento e imprevisível (Kiwipete ~525ms/pos no Node). Nodes cabe em ≤2 min para 40 e 80 plies. Fechar o painel cancela a análise; offscreen fica para depois.
+Padrão: `go nodes 400000`, MultiPV=2, Threads=1, `sf_18` (NNUE completo) no Side Panel.
+Presets: Rápido 80k, Padrão 400k, Profundo 1,5M. WASM com 1 thread não reproduz bitwise o fishnet do Lichess (~1,5M nodes, nativo). Fechar o painel cancela a análise; offscreen fica para depois.
 
-## Precisão (`epl-v1`)
+## Precisão (`lila-v1`)
 
-Win% usa a curva logística do Lichess (`0.00368208`). Precisão **não** usa `103.1668 * exp(...)`.
+Win% usa a curva logística do Lichess (`0.00368208`); mates convertem para cp antes da logística. Precisão de lance e partida segue o código do Lichess (`AccuracyPercent.scala`):
 
-- Lance: `100 * (1 - EPL)^1.2`
-- Partida: `0.5 * trimmedMean + 0.5 * harmonicMean`
-- Classes: Best / Good / Imprecisão / Erro / Blunder
-- Hopeless (win% ≤ 10) → Forced, fora da precisão
+- Lance: curva `103.1668… * exp(-0.04354… * winDiff) - 3.1669…` com bônus +1 de incerteza
+- Partida: média ponderada por volatilidade (desvio padrão populacional das janelas de Win%) + média harmônica, por cor
+- Classes: Best / Good / Imprecisão / Erro / Blunder (limiares EPL 0,02 / 0,05 / 0,10 / 0,15)
+- Hopeless (win% ≤ 10) → Forced, mas a precisão **ainda é calculada** e entra no agregado
 
 ## Licenças
 

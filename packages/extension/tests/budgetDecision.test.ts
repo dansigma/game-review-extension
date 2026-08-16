@@ -8,15 +8,15 @@ import {
 
 describe("engine quality presets", () => {
   it("maps fast, standard and deep to go nodes budgets", () => {
-    expect(nodesForPreset("fast")).toBe(20_000);
-    expect(nodesForPreset("standard")).toBe(80_000);
-    expect(nodesForPreset("deep")).toBe(200_000);
+    expect(nodesForPreset("fast")).toBe(80_000);
+    expect(nodesForPreset("standard")).toBe(400_000);
+    expect(nodesForPreset("deep")).toBe(1_500_000);
   });
 
-  it("defaults to standard at 80k nodes", () => {
+  it("defaults to standard at 400k nodes", () => {
     expect(DEFAULT_ENGINE_PRESET).toBe("standard");
     expect(nodesForPreset(DEFAULT_ENGINE_PRESET)).toBe(MVP_NODES_PER_POSITION);
-    expect(MVP_NODES_PER_POSITION).toBe(80_000);
+    expect(MVP_NODES_PER_POSITION).toBe(400_000);
   });
 
   it("exposes Portuguese labels for the side panel", () => {

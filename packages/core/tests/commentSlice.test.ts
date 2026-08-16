@@ -26,7 +26,7 @@ function stubReview(moves: ReviewedMove[]): GameReview {
   return {
     gameId: "game-1",
     algoVersion: ALGO_VERSION,
-    engineId: "sf_18_smallnet",
+    engineId: "sf_18",
     white: {
       color: "white",
       movesCounted: 1,
@@ -125,13 +125,13 @@ describe("buildCommentSlice", () => {
     expect(buildCommentSlice(review, 99)).toBeNull();
   });
 
-  it("includes forced moves with accuracy null and onlyMove false", () => {
+  it("includes forced moves with accuracy and onlyMove false", () => {
     const review = stubReview([
       fakeMove({
         ply: 2,
         color: "white",
         san: "Kf1",
-        accuracy: null,
+        accuracy: 85,
         classification: "forced",
         classificationLabel: "Forced",
         playerWinPercentBefore: 5,
@@ -151,7 +151,7 @@ describe("buildCommentSlice", () => {
       color: "white",
       classification: "forced",
       epl: 0,
-      accuracy: null,
+      accuracy: 85,
       playerWinPercentBefore: 5,
       playerWinPercentAfter: 4,
       playedIsBest: true,

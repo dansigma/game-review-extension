@@ -41,7 +41,7 @@ describe("reviewGame on PGN fixtures", () => {
       "a7a6",
     ]);
 
-    const stmWin = [55, 45, 58, 50, 65, 60, 40];
+    const stmWin = [55, 45, 58, 50, 64, 60, 40];
     const pvs = [
       "e2e4",
       "c7c5",
@@ -70,12 +70,12 @@ describe("reviewGame on PGN fixtures", () => {
     const review = reviewGame({
       game,
       evals,
-      engineId: "sf_18_smallnet",
-      nodesPerPosition: 80_000,
+      engineId: "sf_18",
+      nodesPerPosition: 400_000,
     });
 
     expect(review.algoVersion).toBe(ALGO_VERSION);
-    expect(review.algoVersion).toBe("epl-v1");
+    expect(review.algoVersion).toBe("lila-v1");
     expect(review.moves.map((move) => move.classification)).toEqual([
       "best",
       "good",
@@ -94,14 +94,14 @@ describe("reviewGame on PGN fixtures", () => {
     ]);
     expect(review.moves[0]?.playedIsBest).toBe(true);
     expect(review.moves[1]?.playedIsBest).toBe(false);
-    expect(review.moves[4]?.epl).toBeGreaterThanOrEqual(0.2);
+    expect(review.moves[4]?.epl).toBeGreaterThanOrEqual(0.15);
     expect(review.graph).toHaveLength(game.moves.length + 1);
     expect(review.white.movesCounted).toBeGreaterThan(0);
     expect(review.black.movesCounted).toBeGreaterThan(0);
     expect(review.moves.every((move) => !isOnlyMove(move))).toBe(true);
   });
 
-  it("marks hopeless plies Forced and excludes them from accuracy", () => {
+  it("marks hopeless plies Forced but still computes accuracy", () => {
     const game = parsePgn(fixture("hopeless.pgn"));
     expect(game.moves).toHaveLength(2);
 
@@ -135,16 +135,19 @@ describe("reviewGame on PGN fixtures", () => {
     const review = reviewGame({
       game,
       evals,
-      engineId: "sf_18_smallnet",
+      engineId: "sf_18",
     });
 
-    expect(playerWinPercent({ type: "mate", value: -4 })).toBe(0);
+    expect(playerWinPercent({ type: "mate", value: -4 })).toBeLessThanOrEqual(
+      10,
+    );
     expect(review.moves[0]?.classification).toBe("forced");
     expect(review.moves[0]?.classificationLabel).toBe("Forced");
-    expect(review.moves[0]?.accuracy).toBeNull();
-    expect(review.white.movesCounted).toBe(0);
+    expect(typeof review.moves[0]?.accuracy).toBe("number");
+    expect(review.moves[0]?.accuracy).toBeGreaterThan(0);
+    expect(review.white.movesCounted).toBe(1);
     expect(review.white.movesExcludedForced).toBe(1);
-    expect(review.white.accuracy).toBe(0);
+    expect(review.white.accuracy).toBeGreaterThan(0);
   });
 
   it("reviews Scholar's Mate including the mating ply", () => {
@@ -174,7 +177,7 @@ describe("reviewGame on PGN fixtures", () => {
     const review = reviewGame({
       game,
       evals,
-      engineId: "sf_18_smallnet",
+      engineId: "sf_18",
     });
     expect(review.gameId).toBe("fixture1");
     expect(review.moves).toHaveLength(7);
@@ -188,7 +191,7 @@ describe("reviewGame on PGN fixtures", () => {
       reviewGame({
         game,
         evals: [],
-        engineId: "sf_18_smallnet",
+        engineId: "sf_18",
       }),
     ).toThrow(/Expected 3 position evals/);
   });
@@ -222,7 +225,7 @@ describe("reviewGame on PGN fixtures", () => {
     const review = reviewGame({
       game: { ...game, moves: game.moves.slice(0, 1) },
       evals,
-      engineId: "sf_18_smallnet",
+      engineId: "sf_18",
     });
 
     expect(review.moves[0]?.alternativePlayerWinPercent).toBeCloseTo(pv2Win, 5);
@@ -259,7 +262,7 @@ describe("reviewGame on PGN fixtures", () => {
     const review = reviewGame({
       game: { ...game, moves: game.moves.slice(0, 1) },
       evals,
-      engineId: "sf_18_smallnet",
+      engineId: "sf_18",
     });
 
     expect(isOnlyMove(review.moves[0]!)).toBe(false);

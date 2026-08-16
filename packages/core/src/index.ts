@@ -25,11 +25,16 @@ export type {
 
 export {
   aggregateAccuracy,
+  gameAccuracy,
   harmonicMean,
   mean,
   moveAccuracy,
+  moveAccuracyFromWinPercents,
+  standardDeviation,
   trimmedMean,
+  weightedMean,
 } from "./accuracy.ts";
+export type { GameAccuracyResult } from "./accuracy.ts";
 export { buildCommentSlice } from "./commentSlice.ts";
 export type { CommentSlice } from "./commentSlice.ts";
 export { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
@@ -51,6 +56,7 @@ export { reviewGame, ReviewEngineError } from "./reviewEngine.ts";
 export {
   clamp,
   expectedPointsLost,
+  mateToCentipawns,
   playerWinPercent,
   whiteWinPercent,
   winningChancesFromCp,

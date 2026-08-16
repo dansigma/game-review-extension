@@ -1,6 +1,7 @@
-import { EPL_THRESHOLDS, type MoveClass, type PlayerColor, type ReviewedMove } from "./types.ts";
+import type { MoveClass, PlayerColor, ReviewedMove } from "./types.ts";
 
-export const CRITICAL_EPL_MIN = EPL_THRESHOLDS.inaccuracy;
+/** First Lichess glyph threshold (inaccuracy and worse). */
+export const CRITICAL_EPL_MIN = 0.05;
 export const CRITICAL_MAX_PER_COLOR = 3;
 
 export interface CriticalMoment {
@@ -27,7 +28,7 @@ function selectTopPerColor(
     .filter(
       (move) =>
         move.color === color &&
-        move.accuracy !== null &&
+        move.classification !== "forced" &&
         move.epl >= CRITICAL_EPL_MIN,
     )
     .sort(compareForSelection)

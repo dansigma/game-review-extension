@@ -80,7 +80,6 @@ describe("isOnlyMove", () => {
     const move = fakeMove({
       ply: 0,
       color: "white",
-      accuracy: null,
       classification: "forced",
       playerWinPercentBefore: 5,
       alternativePlayerWinPercent: 0,

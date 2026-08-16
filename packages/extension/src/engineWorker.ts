@@ -29,7 +29,7 @@ self.onmessage = async (event: MessageEvent<EngineCommand>) => {
       const assetBase = message.assetBase.endsWith("/")
         ? message.assetBase
         : `${message.assetBase}/`;
-      const moduleUrl = `${assetBase}sf_18_smallnet.js`;
+      const moduleUrl = `${assetBase}sf_18.js`;
       const imported = (await import(/* @vite-ignore */ moduleUrl)) as {
         default: StockfishFactory;
       };
@@ -43,19 +43,24 @@ self.onmessage = async (event: MessageEvent<EngineCommand>) => {
         post({ type: "error", message: msg });
       };
 
-      const nnueName = engine.getRecommendedNnue(0);
-      if (nnueName) {
+      const loadedNnue: string[] = [];
+      for (let index = 0; index < 2; index += 1) {
+        const nnueName = engine.getRecommendedNnue(index);
+        if (!nnueName) {
+          continue;
+        }
         const response = await fetch(`${assetBase}${nnueName}`);
         if (!response.ok) {
           throw new Error(`Failed to load NNUE ${nnueName}: ${response.status}`);
         }
-        engine.setNnueBuffer(new Uint8Array(await response.arrayBuffer()), 0);
+        engine.setNnueBuffer(new Uint8Array(await response.arrayBuffer()), index);
+        loadedNnue.push(nnueName);
       }
 
       post({
         type: "ready",
-        engineName: "sf_18_smallnet",
-        nnue: nnueName,
+        engineName: "sf_18",
+        nnue: loadedNnue.join(", ") || undefined,
       });
       return;
     }

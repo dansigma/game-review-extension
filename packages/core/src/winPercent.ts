@@ -9,6 +9,18 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 /**
+ * Mate score → centipawns (Lichess `winningChances` / scalachess).
+ * mate 0 → 0 cp (checkmated side to move).
+ */
+export function mateToCentipawns(mate: number): number {
+  if (mate === 0) {
+    return 0;
+  }
+  const sign = mate > 0 ? 1 : -1;
+  return (21 - Math.min(10, Math.abs(mate))) * 100 * sign;
+}
+
+/**
  * Winning chances in [-1, 1] from a centipawn eval (side-to-move).
  * Same logistic curve Lichess uses for Win%.
  */
@@ -23,7 +35,7 @@ export function playerWinPercent(score: EngineScore): number {
     if (score.value === 0) {
       return 0;
     }
-    return score.value > 0 ? 100 : 0;
+    return 50 + 50 * winningChancesFromCp(mateToCentipawns(score.value));
   }
   return 50 + 50 * winningChancesFromCp(score.value);
 }
