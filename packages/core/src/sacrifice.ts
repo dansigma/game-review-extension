@@ -105,7 +105,7 @@ function qsearch(fen: string, depth: number, budget: QSearchBudget): number {
     const score = -qsearch(next.fen(), depth - 1, budget);
     if (score > best) {
       best = score;
-      if (best >= MATE_SCORE / 2) {
+      if (best > -MATE_SCORE / 2) {
         break;
       }
     }
