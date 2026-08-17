@@ -710,7 +710,7 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
 });
 
 log(
-  "Side Panel pronto. Análise no documento offscreen (fechar o painel não cancela; Cancelar sim). Threads=2; SharedArrayBuffer exigido pelo sf_18 (COOP/COEP).",
+  "Side Panel pronto. Análise no documento offscreen (fechar o painel não cancela; Cancelar sim). Threads=4; SharedArrayBuffer exigido pelo sf_18 (COOP/COEP).",
 );
 setStatus("Aguardando");
 
