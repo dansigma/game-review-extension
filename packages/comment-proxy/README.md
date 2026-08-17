@@ -8,7 +8,7 @@ Receives a `CommentSlice` JSON body from the extension and forwards a Portuguese
 wrangler secret put OPENROUTER_API_KEY
 ```
 
-Optional model override (default `openai/gpt-4o-mini` in `wrangler.toml`):
+Optional model override (default `openai/gpt-5.6-luna` in `wrangler.toml`):
 
 ```bash
 wrangler secret put OPENROUTER_MODEL   # or set [vars] OPENROUTER_MODEL

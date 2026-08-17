@@ -1,7 +1,7 @@
 import { buildPrompt } from "./buildPrompt.ts";
 
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openai/gpt-4o-mini";
+const DEFAULT_MODEL = "openai/gpt-5.6-luna";
 
 export interface OpenRouterEnv {
   OPENROUTER_API_KEY?: string;
@@ -17,6 +17,20 @@ export interface OpenRouterFailure {
   ok: false;
   status: number;
   message: string;
+}
+
+const MIN_COMMENT_LENGTH = 12;
+
+function normalizeSan(san: string): string {
+  return san.trim().replace(/[+#!?]+$/, "");
+}
+
+function isTruncatedComment(content: string, san: string): boolean {
+  const trimmed = content.trim();
+  if (trimmed.length < MIN_COMMENT_LENGTH) {
+    return true;
+  }
+  return normalizeSan(trimmed) === normalizeSan(san);
 }
 
 export async function requestOpenRouterComment(
@@ -50,7 +64,11 @@ export async function requestOpenRouterComment(
           { role: "user", content: user },
         ],
         temperature: 0.4,
-        max_tokens: 256,
+        max_tokens: 2048,
+        reasoning: {
+          effort: "low",
+          exclude: true,
+        },
       }),
     });
 
@@ -71,6 +89,14 @@ export async function requestOpenRouterComment(
         ok: false,
         status: 502,
         message: "Resposta vazia do modelo.",
+      };
+    }
+
+    if (isTruncatedComment(content, slice.san)) {
+      return {
+        ok: false,
+        status: 502,
+        message: "Falha ao gerar comentário.",
       };
     }
 

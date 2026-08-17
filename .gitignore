@@ -8,3 +8,6 @@ packages/extension/public/engine/
 .vite/
 .turbo/
 coverage/
+.env
+.env.local
+.dev.vars

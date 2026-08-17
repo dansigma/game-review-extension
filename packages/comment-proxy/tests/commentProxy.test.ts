@@ -21,6 +21,8 @@ const VALID_SLICE: CommentSlice = {
   evalBefore: "0.2",
   bestSan: "d4",
   engineLine: "d4 d5 c4",
+  replyLine: "Qxd4 Nf3",
+  fenAfter: "8/2q5/8/8/8/2Q5/8/8 w - - 0 1",
 };
 
 describe("parseCommentSlice", () => {
@@ -75,14 +77,54 @@ describe("parseCommentSlice", () => {
 });
 
 describe("buildPrompt", () => {
-  it("includes SAN and eval but not UCI", () => {
+  it("includes the fact card and a shorter system prompt", () => {
     const { system, user } = buildPrompt(VALID_SLICE);
-    expect(system).toContain("português");
+    expect(system).toContain("10 anos");
+    expect(system).toContain("cartão de fatos");
+    expect(system).toContain("Não use diminutivos");
+    expect(system).not.toContain("nunca diga torre");
+    expect(system).not.toContain("não invente Bxc7");
+    expect(user).toContain("Cartão de fatos");
+    expect(user).toContain("Gravidade:");
     expect(user).toContain("Bb5");
-    expect(user).toContain("d4");
-    expect(user).toContain("0.2 → -0.3");
+    expect(user).toContain("Qxd4");
+    expect(user).toContain("MOTIVO");
+    expect(user).toContain("FEN de backup");
+    expect(user).toContain("8/2q5/8/8/8/2Q5/8/8");
     expect(user).not.toMatch(/\be2e4\b/);
     expect(buildPromptText(VALID_SLICE)).not.toContain("uci");
+  });
+
+  it("puts bishop on c8 in the fact card for Nxc8, not a rook", () => {
+    const slice: CommentSlice = {
+      ...VALID_SLICE,
+      fenAfter: "2b1k3/8/3N4/8/8/8/8/4K3 w - - 0 1",
+      replyLine: "Nxc8",
+    };
+    const { system, user } = buildPrompt(slice);
+
+    expect(user).toContain("Tabuleiro em português:");
+    expect(user).toContain("c8 bispo preto");
+    expect(user).toContain("Filme do MOTIVO:");
+    expect(user).toContain("Nxc8 toma bispo");
+    expect(user).toContain("Material em palavras:");
+    expect(user).toMatch(/\+peça|dama de graça/);
+    expect(user).not.toContain("torre");
+    expect(system).toContain("Não adivinhe qual peça");
+    expect(system).not.toContain("SAN de captura não diz");
+  });
+
+  it("marks recapture trades in the fact card", () => {
+    const slice: CommentSlice = {
+      ...VALID_SLICE,
+      fenAfter: "2bqk3/8/3N4/8/8/8/8/4K3 w - - 0 1",
+      replyLine: "Nxc8",
+    };
+    const { system, user } = buildPrompt(slice);
+
+    expect(user).toContain("Material em palavras: igual");
+    expect(user).toMatch(/recaptura|material igual/);
+    expect(system).toContain("Não diga ganho de material se o cartão disser igual");
   });
 });
 
@@ -113,7 +155,7 @@ describe("requestOpenRouterComment", () => {
 
     const result = await requestOpenRouterComment(
       VALID_SLICE,
-      { OPENROUTER_API_KEY: "test-key", OPENROUTER_MODEL: "openai/gpt-4o-mini" },
+      { OPENROUTER_API_KEY: "test-key", OPENROUTER_MODEL: "openai/gpt-5.6-luna" },
       fetchImpl as unknown as typeof fetch,
     );
 
@@ -122,8 +164,32 @@ describe("requestOpenRouterComment", () => {
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toContain("openrouter.ai");
     const payload = JSON.parse(String(init?.body));
-    expect(payload.messages[1].content).toContain("Bb5");
+    expect(payload.max_tokens).toBe(2048);
+    expect(payload.reasoning).toEqual({ effort: "low", exclude: true });
+    expect(payload.messages[1].content).toContain("Cartão de fatos");
     expect(JSON.stringify(payload)).not.toContain("uci");
+  });
+
+  it("returns 502 when model returns only the played SAN", async () => {
+    const slice: CommentSlice = { ...VALID_SLICE, san: "Qc7" };
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: "Qc7" } }],
+      }),
+    }));
+
+    const result = await requestOpenRouterComment(
+      slice,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      status: 502,
+      message: "Falha ao gerar comentário.",
+    });
   });
 
   it("returns 502 on upstream failure", async () => {
