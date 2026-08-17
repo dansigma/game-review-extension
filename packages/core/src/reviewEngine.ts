@@ -1,7 +1,8 @@
 import { Chess } from "chess.js";
 import { gameAccuracy, moveAccuracyFromWinPercents } from "./accuracy.ts";
-import { classificationLabel, classifyMove } from "./classify.ts";
-import { ONLY_MOVE_WIN_PERCENT_GAP } from "./onlyMove.ts";
+import { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
+import { meetsOnlyMoveGap } from "./onlyMove.ts";
+import { isTrivialRecapture } from "./recapture.ts";
 import { isSacrifice } from "./sacrifice.ts";
 import {
   ALGO_VERSION,
@@ -144,10 +145,18 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
     const alternativePlayerWinPercent = pv2
       ? playerWinPercent(pv2.score)
       : undefined;
-    const isOnlyMove =
-      alternativePlayerWinPercent !== undefined &&
-      playerWinBefore - alternativePlayerWinPercent >=
-        ONLY_MOVE_WIN_PERCENT_GAP;
+    const prevGameMove = i > 0 ? game.moves[i - 1] : undefined;
+    const trivialRecapture =
+      prevGameMove !== undefined &&
+      isTrivialRecapture(
+        { fenBefore: prevGameMove.fenBefore, uci: prevGameMove.uci },
+        { fenBefore: move.fenBefore, uci: move.uci },
+        pv2?.pv[0],
+      );
+    const onlyMove =
+      meetsOnlyMoveGap(playerWinBefore, alternativePlayerWinPercent) &&
+      !trivialRecapture &&
+      !isHopeless(playerWinBefore);
     const previous = reviewed[i - 1];
     const previousOpponentEpl =
       previous && previous.color !== move.color ? previous.epl : undefined;
@@ -156,7 +165,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       playedIsBest,
       playerWinPercentBefore: playerWinBefore,
       playerWinPercentAfter: playerWinAfter,
-      isOnlyMove,
+      isOnlyMove: onlyMove,
       isSacrifice: isSacrifice(move.fenBefore, move.uci),
       previousOpponentEpl,
     });
@@ -189,6 +198,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       playedIsBest,
       alternativeUci: pv2?.pv[0],
       alternativePlayerWinPercent,
+      onlyMove,
     });
 
     graph.push({

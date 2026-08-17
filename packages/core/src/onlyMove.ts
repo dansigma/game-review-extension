@@ -19,15 +19,30 @@ export function onlyMoveWinPercentGap(move: ReviewedMove): number | null {
   return move.playerWinPercentBefore - move.alternativePlayerWinPercent;
 }
 
+export function meetsOnlyMoveGap(
+  playerWinPercentBefore: number,
+  alternativePlayerWinPercent: number | undefined,
+): boolean {
+  if (alternativePlayerWinPercent === undefined) {
+    return false;
+  }
+  return (
+    playerWinPercentBefore - alternativePlayerWinPercent >=
+    ONLY_MOVE_WIN_PERCENT_GAP
+  );
+}
+
 export function isOnlyMove(move: ReviewedMove): boolean {
   if (move.classification === "forced") {
     return false;
   }
-  const gap = onlyMoveWinPercentGap(move);
-  if (gap === null) {
-    return false;
+  if (move.onlyMove !== undefined) {
+    return move.onlyMove;
   }
-  return gap >= ONLY_MOVE_WIN_PERCENT_GAP;
+  return meetsOnlyMoveGap(
+    move.playerWinPercentBefore,
+    move.alternativePlayerWinPercent,
+  );
 }
 
 export function selectOnlyMoves(moves: readonly ReviewedMove[]): OnlyMove[] {

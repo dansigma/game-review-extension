@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { Chess } from "chess.js";
 import {
   isOnlyMove,
+  meetsOnlyMoveGap,
   ONLY_MOVE_WIN_PERCENT_GAP,
   onlyMoveWinPercentGap,
   selectOnlyMoves,
 } from "../src/onlyMove.ts";
+import { isTrivialRecapture } from "../src/recapture.ts";
 import type { MoveClass, ReviewedMove } from "../src/types.ts";
 
 function fakeMove(
@@ -120,6 +123,52 @@ describe("isOnlyMove", () => {
       alternativePlayerWinPercent: 50 - ONLY_MOVE_WIN_PERCENT_GAP + 0.01,
       alternativeUci: "c7c5",
     });
+    expect(isOnlyMove(move)).toBe(false);
+  });
+
+  it("uses persisted onlyMove when present", () => {
+    const move = fakeMove({
+      ply: 2,
+      color: "white",
+      playerWinPercentBefore: 70,
+      alternativePlayerWinPercent: 40,
+      onlyMove: false,
+    });
+    expect(isOnlyMove(move)).toBe(false);
+  });
+
+  it("suppresses only-move for trivial recapture even with large gap", () => {
+    const chess = new Chess();
+    for (const san of ["e4", "e5", "Nf3", "Nc6", "d4"]) {
+      chess.move(san);
+    }
+    const fenBeforeBlackCapture = chess.fen();
+    const blackCapture = chess.move("exd4");
+    expect(blackCapture).toBeTruthy();
+    const fenBeforeRecapture = chess.fen();
+    const recapture = chess.move("Nxd4");
+    expect(recapture).toBeTruthy();
+
+    const previous = {
+      fenBefore: fenBeforeBlackCapture,
+      uci: blackCapture!.from + blackCapture!.to,
+    };
+    const current = {
+      fenBefore: fenBeforeRecapture,
+      uci: recapture!.from + recapture!.to,
+    };
+    expect(isTrivialRecapture(previous, current, "c2c3")).toBe(true);
+    expect(meetsOnlyMoveGap(62, 48)).toBe(true);
+
+    const move = fakeMove({
+      ply: 6,
+      color: "white",
+      playerWinPercentBefore: 62,
+      alternativePlayerWinPercent: 48,
+      alternativeUci: "c2c3",
+      onlyMove: !isTrivialRecapture(previous, current, "c2c3"),
+    });
+    expect(move.onlyMove).toBe(false);
     expect(isOnlyMove(move)).toBe(false);
   });
 });
