@@ -21,7 +21,8 @@ import {
   sessionGameLoadSource,
   type GameLoadSource,
 } from "./gameCardDisplay.ts";
-import type { ActiveGameData } from "./messages.ts";
+import type { ActiveGameData, AnalysisBroadcast } from "./messages.ts";
+import { isAnalysisBroadcast } from "./messages.ts";
 import {
   createEnginePort,
   KIWIPETE_FEN,
@@ -30,10 +31,8 @@ import {
 import type { NormalizedGame, GameReview } from "@game-review/core";
 import { parsePgn } from "@game-review/core";
 import { MVP_GO_COMMAND } from "./budgetDecision.ts";
-import { reviewGameWithEngine } from "./reviewWithEngine.ts";
-import { getCachedReview, putCachedReview } from "./reviewCache.ts";
+import { getCachedReview } from "./reviewCache.ts";
 import { reviewCacheParams } from "./reviewCacheParams.ts";
-import { shouldPutCachedReview } from "./analysisCachePolicy.ts";
 import { estimateRemainingMs } from "./analysisEta.ts";
 import { formatReviewError } from "./reviewErrors.ts";
 import { fullMoveCount } from "./gameMoves.ts";
@@ -61,8 +60,9 @@ const loadErrorEl = document.querySelector("#load-error");
 let activeGameId: string | null = null;
 let autoLoadAttemptedFor: string | null = null;
 let loadedGame: NormalizedGame | null = null;
-let analysisEngine: EnginePort | null = null;
-let analysisAbort: AbortController | null = null;
+let offscreenAnalysisGameId: string | null = null;
+let offscreenAnalysisStartedAt = 0;
+let reanalyzePreviousReview: GameReview | null = null;
 
 const reviewPanel = new GameReviewPanel(queryGameReviewPanel(document));
 
@@ -184,6 +184,10 @@ async function finishLoadingGame(
   loadedGame = game;
   showGameSummary(game);
   reviewPanel.setGame(game);
+  await syncOffscreenAnalysisUi();
+  if (offscreenAnalysisGameId === game.gameId) {
+    return;
+  }
   const fromCache = await tryShowCachedReview(game);
   if (!fromCache) {
     setStatus(`Partida ${game.gameId} carregada`);
@@ -324,7 +328,15 @@ async function sendBackground(
     | { type: "lichess-export"; gameId: string }
     | { type: "lichess-tv" }
     | { type: "chesscom-callback"; kind: ChesscomGameKind; id: string }
-    | { type: "chesscom-archive"; username: string; year: number; month: number },
+    | { type: "chesscom-archive"; username: string; year: number; month: number }
+    | {
+        type: "analysis-start";
+        game: NormalizedGame;
+        nodesPerPosition: number;
+        bypassCache?: boolean;
+      }
+    | { type: "analysis-cancel" }
+    | { type: "analysis-status" },
 ): Promise<unknown> {
   const response = await chrome.runtime.sendMessage(message);
   if (!response || response.ok !== true) {
@@ -501,7 +513,9 @@ pgnFileInput?.addEventListener("change", () => {
 });
 
 function cancelAnalysis(): void {
-  analysisAbort?.abort();
+  void sendBackground({ type: "analysis-cancel" }).catch((error: unknown) => {
+    log(`analysis cancel failed: ${formatReviewError(error)}`);
+  });
 }
 
 function restoreAfterCancelledAnalysis(
@@ -515,17 +529,96 @@ function restoreAfterCancelledAnalysis(
   }
 }
 
-async function runGameReview(options?: { bypassCache?: boolean }): Promise<void> {
+function handleAnalysisProgress(message: Extract<AnalysisBroadcast, { type: "analysis-progress" }>): void {
+  if (!loadedGame || loadedGame.gameId !== message.gameId) {
+    return;
+  }
+  const elapsedMs = performance.now() - offscreenAnalysisStartedAt;
+  const remainingMs = estimateRemainingMs(elapsedMs, message.done, message.total);
+  reviewPanel.showAnalyzing(message.done, message.total, remainingMs);
+  setStatus(`Analisando… ${message.done}/${message.total}`);
+}
+
+function handleAnalysisComplete(message: Extract<AnalysisBroadcast, { type: "analysis-complete" }>): void {
+  offscreenAnalysisGameId = null;
+  reanalyzePreviousReview = null;
+  if (!loadedGame || loadedGame.gameId !== message.gameId) {
+    return;
+  }
+  reviewPanel.showReview(message.review, loadedGame);
+  setStatus("Análise concluída");
+  log(
+    `review ${message.gameId}: white ${message.review.white.accuracy.toFixed(1)}% black ${message.review.black.accuracy.toFixed(1)}%`,
+  );
+}
+
+function handleAnalysisError(message: Extract<AnalysisBroadcast, { type: "analysis-error" }>): void {
+  offscreenAnalysisGameId = null;
+  const game = loadedGame;
+  const previousReview = reanalyzePreviousReview;
+  reanalyzePreviousReview = null;
+  if (!game || game.gameId !== message.gameId) {
+    return;
+  }
+  restoreAfterCancelledAnalysis(previousReview, game);
+  setStatus(message.error);
+  log(`analysis failed: ${message.error}`);
+}
+
+function handleAnalysisCancelled(message: Extract<AnalysisBroadcast, { type: "analysis-cancelled" }>): void {
+  offscreenAnalysisGameId = null;
+  const game = loadedGame;
+  const previousReview = reanalyzePreviousReview;
+  reanalyzePreviousReview = null;
+  if (!game || game.gameId !== message.gameId) {
+    return;
+  }
+  restoreAfterCancelledAnalysis(previousReview, game);
+  setStatus("Análise cancelada");
+  log("analysis cancelled");
+}
+
+async function syncOffscreenAnalysisUi(): Promise<void> {
   if (!loadedGame) {
     return;
   }
-  if (analysisEngine) {
+  try {
+    const status = (await sendBackground({ type: "analysis-status" })) as {
+      state: "idle" | "running";
+      gameId?: string;
+      done?: number;
+      total?: number;
+    };
+    if (status.state !== "running" || status.gameId !== loadedGame.gameId) {
+      return;
+    }
+    offscreenAnalysisGameId = status.gameId ?? null;
+    offscreenAnalysisStartedAt = performance.now();
+    const done = status.done ?? 0;
+    const total = status.total ?? loadedGame.moves.length + 1;
+    reviewPanel.showAnalyzing(done, total);
+    setStatus(`Analisando… ${done}/${total}`);
+    log(`offscreen analysis in progress for ${status.gameId}`);
+  } catch (error: unknown) {
+    log(`analysis status failed: ${formatReviewError(error)}`);
+  }
+}
+
+async function runGameReview(options?: { bypassCache?: boolean }): Promise<void> {
+  if (!loadedGame) {
     return;
   }
 
   const game = loadedGame;
   const nodesPerPosition = reviewPanel.getNodesPerPosition();
   const bypassCache = options?.bypassCache ?? false;
+
+  if (
+    offscreenAnalysisGameId === game.gameId &&
+    !bypassCache
+  ) {
+    return;
+  }
 
   if (!bypassCache) {
     const cached = await getCachedReview(selectedReviewCacheParams(game.gameId));
@@ -537,56 +630,33 @@ async function runGameReview(options?: { bypassCache?: boolean }): Promise<void>
     }
   }
 
-  const previousReview = bypassCache ? reviewPanel.getReview() : null;
+  reanalyzePreviousReview = bypassCache ? reviewPanel.getReview() : null;
   const total = game.moves.length + 1;
-  analysisAbort = new AbortController();
-  const { signal } = analysisAbort;
-  const analysisStartedAt = performance.now();
-
-  analysisEngine = createEnginePort(assetBase());
+  offscreenAnalysisGameId = game.gameId;
+  offscreenAnalysisStartedAt = performance.now();
   reviewPanel.showAnalyzing(0, total);
   setStatus("Analisando partida…");
 
   try {
-    await analysisEngine.init();
-    const review = await reviewGameWithEngine(analysisEngine, {
+    const result = (await sendBackground({
+      type: "analysis-start",
       game,
       nodesPerPosition,
-      signal,
-      onProgress: (done, progressTotal) => {
-        const elapsedMs = performance.now() - analysisStartedAt;
-        const remainingMs = estimateRemainingMs(elapsedMs, done, progressTotal);
-        reviewPanel.showAnalyzing(done, progressTotal, remainingMs);
-        setStatus(`Analisando… ${done}/${progressTotal}`);
-      },
-    });
-    if (!shouldPutCachedReview(signal.aborted, review)) {
-      restoreAfterCancelledAnalysis(previousReview, game);
-      setStatus("Análise cancelada");
-      log("analysis cancelled");
+      bypassCache,
+    })) as { started?: boolean };
+
+    if (result.started === false) {
+      offscreenAnalysisGameId = game.gameId;
+      await syncOffscreenAnalysisUi();
       return;
     }
-    await putCachedReview(review);
-    reviewPanel.showReview(review, game);
-    setStatus("Análise concluída");
-    log(
-      `review ${game.gameId}: white ${review.white.accuracy.toFixed(1)}% black ${review.black.accuracy.toFixed(1)}%`,
-    );
   } catch (error: unknown) {
-    if (signal.aborted) {
-      restoreAfterCancelledAnalysis(previousReview, game);
-      setStatus("Análise cancelada");
-      log("analysis cancelled");
-      return;
-    }
+    offscreenAnalysisGameId = null;
+    reanalyzePreviousReview = null;
     const text = formatReviewError(error);
-    restoreAfterCancelledAnalysis(previousReview, game);
+    reviewPanel.showAnalyzeReady();
     setStatus(text);
-    log(`analysis failed: ${text}`);
-  } finally {
-    analysisEngine?.dispose();
-    analysisEngine = null;
-    analysisAbort = null;
+    log(`analysis start failed: ${text}`);
   }
 }
 
@@ -606,7 +676,7 @@ reviewPanel.setHandlers({
 });
 
 async function onEnginePresetChanged(): Promise<void> {
-  if (!loadedGame || analysisEngine) {
+  if (!loadedGame || offscreenAnalysisGameId) {
     return;
   }
   const fromCache = await tryShowCachedReview(loadedGame);
@@ -617,10 +687,32 @@ async function onEnginePresetChanged(): Promise<void> {
   }
 }
 
-window.addEventListener("beforeunload", () => {
-  cancelAnalysis();
-  analysisEngine?.dispose();
+chrome.runtime.onMessage.addListener((message: unknown) => {
+  if (!isAnalysisBroadcast(message)) {
+    return;
+  }
+  switch (message.type) {
+    case "analysis-progress":
+      handleAnalysisProgress(message);
+      break;
+    case "analysis-complete":
+      handleAnalysisComplete(message);
+      break;
+    case "analysis-error":
+      handleAnalysisError(message);
+      break;
+    case "analysis-cancelled":
+      handleAnalysisCancelled(message);
+      break;
+    default:
+      break;
+  }
 });
+
+log(
+  "Side Panel pronto. Análise no documento offscreen (fechar o painel não cancela; Cancelar sim). Threads=2; SharedArrayBuffer exigido pelo sf_18 (COOP/COEP).",
+);
+setStatus("Aguardando");
 
 document.querySelector("#poc1")?.addEventListener("click", () => {
   void runPoc1().catch((error: unknown) => {
@@ -676,8 +768,4 @@ document.querySelector("#poc3-80")?.addEventListener("click", () => {
   );
 });
 
-log(
-  "Side Panel pronto. Engine no painel (fecha o painel, cancela). Threads=2; SharedArrayBuffer exigido pelo sf_18 (COOP/COEP).",
-);
-setStatus("Aguardando");
 void loadActiveGameFromSession();
