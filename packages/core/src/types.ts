@@ -1,5 +1,5 @@
-/** Accuracy curve unchanged (Lichess lila); move-class ladder simplified in v5. */
-export const ALGO_VERSION = "lila-v5" as const;
+/** Accuracy curve unchanged (Lichess lila); move-class ladder simplified in v6 (trivial recapture only-move filter). */
+export const ALGO_VERSION = "lila-v6" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
@@ -121,6 +121,8 @@ export interface ReviewedMove {
   alternativeUci?: string;
   /** Side-to-move win% for MultiPV line 2 before the played move; absent when PV2 missing. */
   alternativePlayerWinPercent?: number;
+  /** PV1−PV2 gap ≥ 10 and not a trivial recapture; absent in legacy reviews / test fakes. */
+  onlyMove?: boolean;
 }
 
 export interface EvalGraphPoint {

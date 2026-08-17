@@ -62,7 +62,14 @@ export type {
   JudgementsByColor,
 } from "./criticalMoments.ts";
 export {
+  isCapture,
+  isRecapture,
+  isTrivialRecapture,
+} from "./recapture.ts";
+export type { RecapturePly } from "./recapture.ts";
+export {
   isOnlyMove,
+  meetsOnlyMoveGap,
   ONLY_MOVE_WIN_PERCENT_GAP,
   onlyMoveWinPercentGap,
   selectOnlyMoves,

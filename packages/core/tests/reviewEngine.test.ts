@@ -241,6 +241,7 @@ describe("reviewGame on PGN fixtures", () => {
 
     expect(review.moves[0]?.alternativePlayerWinPercent).toBeCloseTo(pv2Win, 5);
     expect(review.moves[0]?.playerWinPercentBefore).toBeCloseTo(pv1Win, 5);
+    expect(review.moves[0]?.onlyMove).toBe(true);
     expect(isOnlyMove(review.moves[0]!)).toBe(true);
     expect(review.moves[0]?.classification).toBe("great");
   });
@@ -523,5 +524,66 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.moves[1]?.classification).toBe("miss");
     expect(review.moves[1]?.playerWinPercentBefore).toBeCloseTo(blackBefore, 4);
     expect(review.moves[1]?.playerWinPercentAfter).toBeCloseTo(blackAfter, 4);
+  });
+
+  it("does not flag only-move or Great for trivial recapture despite large PV gap", () => {
+    const game = parsePgn(`[Event "recapture"]
+[White "w"]
+[Black "b"]
+
+1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4`);
+    const blackCapture = game.moves[5];
+    const whiteRecapture = game.moves[6];
+    expect(blackCapture?.uci).toBe("e5d4");
+    expect(whiteRecapture?.uci).toBe("f3d4");
+
+    const subsetGame = {
+      ...game,
+      initialFen: game.moves[4]!.fenAfter,
+      moves: [blackCapture!, whiteRecapture!],
+    };
+
+    const pv1Win = 62;
+    const pv2Win = 48;
+    const afterWin = 64;
+    const evals: PositionEval[] = [
+      {
+        fen: subsetGame.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(50) }, "e5d4"),
+          line(2, { type: "cp", value: cpFromWinPercent(49) }, "c7c5"),
+        ],
+      },
+      {
+        fen: whiteRecapture!.fenBefore,
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(pv1Win) }, "f3d4"),
+          line(2, { type: "cp", value: cpFromWinPercent(pv2Win) }, "c2c3"),
+        ],
+      },
+      {
+        fen: whiteRecapture!.fenAfter,
+        ply: 2,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(100 - afterWin) }, "g8f6"),
+          line(2, { type: "cp", value: cpFromWinPercent(100 - afterWin - 5) }, "d7d6"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: subsetGame,
+      evals,
+      engineId: "sf_18",
+    });
+
+    const recaptureMove = review.moves[1];
+    expect(recaptureMove?.playedIsBest).toBe(true);
+    expect(recaptureMove?.onlyMove).toBe(false);
+    expect(isOnlyMove(recaptureMove!)).toBe(false);
+    expect(recaptureMove?.classification).toBe("best");
+    expect(recaptureMove?.classification).not.toBe("great");
   });
 });
