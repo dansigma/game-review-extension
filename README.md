@@ -8,6 +8,7 @@ Arquitetura travada em [SIG-651](https://linear.app/sigmalabs/issue/SIG-651). Es
 
 - `packages/core` — `NormalizedGame` + `ReviewEngine` (TypeScript puro, sem Chrome/DOM). SIG-653.
 - `packages/extension` — shell MV3 + Side Panel. SIG-652.
+- `packages/comment-proxy` — Worker Cloudflare + OpenRouter para comentários de IA. SIG-661.
 
 Pipeline: `HostAdapter` → `Provider` → `NormalizedGame` → `EnginePort` → `ReviewEngine` → `GameReview` → IndexedDB + Side Panel.
 
@@ -55,6 +56,19 @@ Win% usa a curva logística do Lichess (`0.00368208`); mates convertem para cp a
 - Partida: média ponderada por volatilidade (desvio padrão populacional das janelas de Win%) + média harmônica, por cor
 - Classes: Brilliant / Great / Best / Erro / Miss / Blunder (limiares EPL 0,02 qualidade / 0,05 Best / 0,15 Erro; Miss/Brilliant/Great com regras adicionais)
 - Hopeless (win% ≤ 10) → Forced, mas a precisão **ainda é calculada** e entra no agregado
+
+## Comentários de IA (SIG-661)
+
+Comentários em português passam por um **Cloudflare Worker** (`packages/comment-proxy`), que chama OpenRouter. A chave OpenRouter fica apenas como secret do Worker (`wrangler secret put OPENROUTER_API_KEY`). **Nunca** coloque a chave na extensão.
+
+1. Deploy do Worker: ver `packages/comment-proxy/README.md`
+2. Build da extensão com a URL pública do Worker:
+
+```bash
+VITE_COMMENT_PROXY_URL=https://game-review-comment-proxy.<account>.workers.dev npm run build:extension
+```
+
+Stockfish continua **local** na extensão; só o texto do comentário usa a rede.
 
 ## Licenças
 

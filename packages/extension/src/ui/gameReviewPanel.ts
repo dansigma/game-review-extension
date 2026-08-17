@@ -27,6 +27,11 @@ import {
   type EngineQualityPresetId,
 } from "../budgetDecision.ts";
 import { formatAnalysisProgressLabel } from "../analysisEta.ts";
+import {
+  CommentProxyError,
+  isCommentProxyConfigured,
+  requestComment,
+} from "../commentProxy.ts";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
 import { previewEngineLineMove } from "./engineLinePreview.ts";
 import { renderEvalGraph } from "./evalGraph.ts";
@@ -73,6 +78,8 @@ export interface GameReviewPanelElements {
   commentSliceEmpty: HTMLElement;
   commentSliceBody: HTMLElement;
   commentSliceButton: HTMLButtonElement;
+  commentSliceProxyHint: HTMLElement;
+  commentSliceAi: HTMLElement;
   moveListFilterToolbar: HTMLElement;
   moveListFilterLabel: HTMLElement;
   moveListClearFilter: HTMLButtonElement;
@@ -172,6 +179,8 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     commentSliceEmpty: requireEl("#comment-slice-empty"),
     commentSliceBody: requireEl("#comment-slice-body"),
     commentSliceButton,
+    commentSliceProxyHint: requireEl("#comment-slice-proxy-hint"),
+    commentSliceAi: requireEl("#comment-slice-ai"),
     moveListFilterToolbar: requireEl("#move-list-filter-toolbar"),
     moveListFilterLabel: requireEl("#move-list-filter-label"),
     moveListClearFilter,
@@ -203,6 +212,7 @@ export class GameReviewPanel {
   private judgementCycleIndex = new Map<string, number>();
   private moveListFilter: MoveListFilter = null;
   private enginePreviewIndex: number | null = null;
+  private commentInFlight = false;
   private onAnalyze: (() => void) | null = null;
   private onReanalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
@@ -223,6 +233,7 @@ export class GameReviewPanel {
     });
     el.boardFlip.addEventListener("click", () => this.toggleBoardFlip());
     el.moveListClearFilter.addEventListener("click", () => this.clearMoveListFilter());
+    el.commentSliceButton.addEventListener("click", () => this.onCommentClick());
     el.evalCanvas.addEventListener("click", (event) => this.onGraphClick(event));
     window.addEventListener("resize", () => this.refreshView());
   }
@@ -671,7 +682,13 @@ export class GameReviewPanel {
   }
 
   private renderCommentSlice(): void {
-    const { commentSliceEmpty, commentSliceBody, commentSliceButton } = this.el;
+    const {
+      commentSliceEmpty,
+      commentSliceBody,
+      commentSliceButton,
+      commentSliceProxyHint,
+      commentSliceAi,
+    } = this.el;
 
     if (!this.review || this.currentPly < 0) {
       commentSliceEmpty.hidden = false;
@@ -679,6 +696,11 @@ export class GameReviewPanel {
       commentSliceBody.hidden = true;
       commentSliceBody.replaceChildren();
       commentSliceButton.disabled = true;
+      commentSliceButton.title = "";
+      commentSliceProxyHint.hidden = true;
+      commentSliceAi.hidden = true;
+      commentSliceAi.replaceChildren();
+      commentSliceAi.className = "";
       return;
     }
 
@@ -689,6 +711,11 @@ export class GameReviewPanel {
       commentSliceBody.hidden = true;
       commentSliceBody.replaceChildren();
       commentSliceButton.disabled = true;
+      commentSliceButton.title = "";
+      commentSliceProxyHint.hidden = true;
+      commentSliceAi.hidden = true;
+      commentSliceAi.replaceChildren();
+      commentSliceAi.className = "";
       return;
     }
 
@@ -737,7 +764,59 @@ export class GameReviewPanel {
     }
     commentSliceBody.append(...children);
 
+    const proxyConfigured = isCommentProxyConfigured();
+    commentSliceProxyHint.hidden = proxyConfigured;
+    commentSliceButton.textContent = "Comentar";
+    commentSliceButton.disabled = !proxyConfigured || this.commentInFlight;
+    commentSliceButton.title = proxyConfigured ? "" : "Proxy não configurado";
+
+    if (!this.commentInFlight) {
+      commentSliceAi.hidden = true;
+      commentSliceAi.replaceChildren();
+      commentSliceAi.className = "";
+    }
+  }
+
+  private async onCommentClick(): Promise<void> {
+    if (
+      this.commentInFlight ||
+      !this.review ||
+      this.currentPly < 0 ||
+      !isCommentProxyConfigured()
+    ) {
+      return;
+    }
+
+    const slice = buildCommentSlice(this.review, this.currentPly);
+    if (!slice) {
+      return;
+    }
+
+    const { commentSliceButton, commentSliceAi } = this.el;
+    this.commentInFlight = true;
     commentSliceButton.disabled = true;
+    commentSliceAi.hidden = false;
+    commentSliceAi.textContent = "Comentando…";
+    commentSliceAi.className = "comment-slice-ai-loading";
+
+    try {
+      const comment = await requestComment(slice);
+      commentSliceAi.textContent = comment;
+      commentSliceAi.className = "";
+    } catch (error) {
+      const message =
+        error instanceof CommentProxyError
+          ? error.message
+          : "Não foi possível obter o comentário.";
+      commentSliceAi.textContent = message;
+      commentSliceAi.className = "comment-slice-ai-error";
+    } finally {
+      this.commentInFlight = false;
+      commentSliceButton.disabled = !isCommentProxyConfigured();
+      commentSliceButton.title = isCommentProxyConfigured()
+        ? ""
+        : "Proxy não configurado";
+    }
   }
 
   private renderJudgement(slice: CommentSlice): DocumentFragment {

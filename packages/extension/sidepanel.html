@@ -565,6 +565,27 @@
         opacity: 0.7;
         cursor: not-allowed;
       }
+      #comment-slice-proxy-hint {
+        font-size: 11px;
+        color: var(--muted);
+        margin: 0;
+      }
+      #comment-slice-ai {
+        font-size: 12px;
+        line-height: 1.45;
+        margin: 0;
+        padding: 6px 8px;
+        border: 1px solid #333;
+        border-radius: 6px;
+        background: #1a1917;
+      }
+      #comment-slice-ai.comment-slice-ai-loading {
+        color: var(--muted);
+        font-style: italic;
+      }
+      #comment-slice-ai.comment-slice-ai-error {
+        color: var(--warn);
+      }
     </style>
   </head>
   <body>
@@ -638,7 +659,9 @@
             <h3>Comentário</h3>
             <p id="comment-slice-empty">Selecione um lance</p>
             <div id="comment-slice-body" hidden></div>
-            <button id="comment-slice-button" type="button" disabled>Login necessário para comentar</button>
+            <button id="comment-slice-button" type="button" disabled>Comentar</button>
+            <p id="comment-slice-proxy-hint" hidden>Proxy não configurado</p>
+            <p id="comment-slice-ai" hidden></p>
           </div>
           <div class="move-list-wrap">
             <div id="move-list-filter-toolbar" class="move-list-filter-toolbar" hidden>

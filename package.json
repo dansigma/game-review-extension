@@ -6,11 +6,12 @@
   "description": "Chrome MV3 post-game review. Stockfish 18 local. GPL-3.0.",
   "workspaces": [
     "packages/core",
-    "packages/extension"
+    "packages/extension",
+    "packages/comment-proxy"
   ],
   "scripts": {
-    "test": "npm run test -w @game-review/core && npm run test -w @game-review/extension",
-    "typecheck": "npm run typecheck -w @game-review/core && npm run typecheck -w @game-review/extension",
+    "test": "npm run test -w @game-review/core && npm run test -w @game-review/extension && npm run test -w @game-review/comment-proxy",
+    "typecheck": "npm run typecheck -w @game-review/core && npm run typecheck -w @game-review/extension && npm run typecheck -w @game-review/comment-proxy",
     "build:extension": "npm run build -w @game-review/extension",
     "poc:lichess": "npm run poc:lichess -w @game-review/extension",
     "poc:budget": "npm run poc:budget -w @game-review/extension"

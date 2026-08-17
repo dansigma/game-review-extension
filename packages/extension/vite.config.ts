@@ -5,10 +5,23 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 
+function proxyHostPermission(proxyUrl: string): string | null {
+  try {
+    const parsed = new URL(proxyUrl);
+    if (parsed.protocol !== "https:") {
+      return null;
+    }
+    return `https://${parsed.host}/*`;
+  } catch {
+    return null;
+  }
+}
+
 export default defineConfig({
   root,
   publicDir: "public",
   base: "./",
+  envPrefix: "VITE_",
   build: {
     outDir: "dist",
     emptyOutDir: true,
@@ -34,9 +47,20 @@ export default defineConfig({
       name: "extension-static",
       closeBundle() {
         const dist = resolve(root, "dist");
+        const manifest = JSON.parse(
+          readFileSync(resolve(root, "manifest.json"), "utf8"),
+        ) as { host_permissions?: string[] };
+        const proxyUrl = process.env.VITE_COMMENT_PROXY_URL?.trim() ?? "";
+        const permission = proxyHostPermission(proxyUrl);
+        if (permission) {
+          const existing = manifest.host_permissions ?? [];
+          if (!existing.includes(permission)) {
+            manifest.host_permissions = [...existing, permission];
+          }
+        }
         writeFileSync(
           resolve(dist, "manifest.json"),
-          readFileSync(resolve(root, "manifest.json")),
+          JSON.stringify(manifest, null, 2),
         );
       },
     },
