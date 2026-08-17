@@ -4,8 +4,8 @@ import {
 } from "./evalDisplay.ts";
 import type { MoveClass, PlayerColor, ReviewedMove } from "./types.ts";
 
-/** EPL floor for critical-moment selection (mistake band starts here). */
-export const CRITICAL_EPL_MIN = 0.05;
+/** EPL floor for critical-moment selection (Erro band starts here). */
+export const CRITICAL_EPL_MIN = 0.1;
 
 const CRITICAL_CLASSIFICATIONS = new Set<MoveClass>([
   "mistake",
@@ -17,6 +17,7 @@ const DASHBOARD_CLASSIFICATIONS = new Set<MoveClass>([
   "brilliant",
   "great",
   "best",
+  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
@@ -27,6 +28,7 @@ export const DASHBOARD_CLASSES: (keyof JudgementCounts)[] = [
   "brilliant",
   "great",
   "best",
+  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
@@ -47,6 +49,7 @@ export interface JudgementCounts {
   brilliant: number;
   great: number;
   best: number;
+  inaccuracy: number;
   mistake: number;
   miss: number;
   blunder: number;
@@ -58,6 +61,7 @@ const EMPTY_JUDGEMENTS: JudgementCounts = {
   brilliant: 0,
   great: 0,
   best: 0,
+  inaccuracy: 0,
   mistake: 0,
   miss: 0,
   blunder: 0,

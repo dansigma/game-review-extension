@@ -89,7 +89,7 @@ describe("lila-v1 game accuracy", () => {
 });
 
 describe("classification thresholds", () => {
-  it("maps EPL to Best / Erro / Blunder", () => {
+  it("maps EPL to Best / Imprecisão / Erro / Blunder", () => {
     expect(
       classifyMove(ladderArgs({ epl: 0, playedIsBest: true })),
     ).toBe("best");
@@ -110,7 +110,7 @@ describe("classification thresholds", () => {
           playerWinPercentAfter: 42,
         }),
       ),
-    ).toBe("mistake");
+    ).toBe("inaccuracy");
     expect(
       classifyMove(
         ladderArgs({
