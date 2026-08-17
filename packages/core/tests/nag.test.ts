@@ -10,6 +10,7 @@ const ALL_CLASSES: MoveClass[] = [
   "brilliant",
   "great",
   "best",
+  "opening",
   "inaccuracy",
   "mistake",
   "miss",
@@ -27,6 +28,7 @@ describe("classificationGlyph", () => {
     expect(classificationGlyph("miss")).toBe("");
     expect(classificationGlyph("blunder")).toBe("??");
     expect(classificationGlyph("forced")).toBe("");
+    expect(classificationGlyph("opening")).toBe("");
   });
 
   it("uses !! only for Brilliant", () => {
@@ -114,6 +116,12 @@ describe("judgementComment", () => {
         playedIsBest: false,
       }),
     ).toBe("Blunder. Melhor era Qh5.");
+  });
+
+  it("returns opening copy", () => {
+    expect(
+      judgementComment({ classification: "opening", playedIsBest: true }),
+    ).toBe("Lance de abertura.");
   });
 
   it("returns forced copy", () => {

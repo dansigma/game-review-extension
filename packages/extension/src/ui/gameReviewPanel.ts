@@ -44,6 +44,7 @@ const CLASS_CSS: Record<MoveClass, string> = {
   brilliant: "move-brilliant",
   great: "move-great",
   best: "move-best",
+  opening: "move-opening",
   inaccuracy: "move-inaccuracy",
   mistake: "move-mistake",
   miss: "move-miss",
@@ -865,6 +866,9 @@ export class GameReviewPanel {
       case "best":
         appendText("Melhor lance.");
         break;
+      case "opening":
+        appendText("Lance de abertura.");
+        break;
       case "inaccuracy":
         if (bestSan) {
           appendText("Imprecisão. Melhor era ");
@@ -1117,7 +1121,7 @@ function classPliesKey(
 function buildClassPlies(moves: readonly ReviewedMove[]): Map<string, number[]> {
   const plies = new Map<string, number[]>();
   for (const move of moves) {
-    if (move.classification === "forced") {
+    if (move.classification === "forced" || move.classification === "opening") {
       continue;
     }
     const classification = move.classification;

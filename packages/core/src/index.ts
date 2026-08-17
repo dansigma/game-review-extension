@@ -43,7 +43,14 @@ export {
   formatCommentBoardFacts,
 } from "./commentBoardFacts.ts";
 export type { CommentBoardFacts, CommentBoardFactsInput } from "./commentBoardFacts.ts";
-export { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
+export {
+  applyOpeningFilter,
+  classificationLabel,
+  classifyMove,
+  isHopeless,
+} from "./classify.ts";
+export { divideGame, isOpeningPly } from "./divider.ts";
+export type { Division } from "./divider.ts";
 export {
   evalAfterCaptures,
   isSacrifice,

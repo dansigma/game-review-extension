@@ -37,7 +37,7 @@ npm run build:extension
 Reabrir a mesma partida finalizada (Lichess ou PGN colado) não reexecuta o Stockfish se o cache acertar. A chave inclui:
 
 - `gameId`
-- `algoVersion` (`lila-v8`)
+- `algoVersion` (`lila-v9`)
 - `engineId` (`sf_18`)
 - `nodesPerPosition` (`400000`)
 
@@ -48,13 +48,14 @@ Formato: `gameId|algoVersion|engineId|nodesPerPosition`. Mudar `ALGO_VERSION` in
 Padrão: `go nodes 400000`, MultiPV=2, Threads=4, `sf_18` (NNUE completo) no documento offscreen.
 Presets: Rápido 80k, Padrão 400k, Profundo 1,5M. WASM com 1 thread não reproduz bitwise o fishnet do Lichess (~1,5M nodes, nativo). A análise roda em um documento offscreen: fechar o Side Panel **não** cancela; o botão **Cancelar** cancela. Cache continua no IndexedDB.
 
-## Precisão (`lila-v8`)
+## Precisão (`lila-v9`)
 
 Win% usa a curva logística do Lichess (`0.00368208`); mates convertem para cp antes da logística. Precisão de lance e partida segue o código do Lichess (`AccuracyPercent.scala`):
 
 - Lance: curva `103.1668… * exp(-0.04354… * winDiff) - 3.1669…` com bônus +1 de incerteza
 - Partida: média ponderada por volatilidade (desvio padrão populacional das janelas de Win%) + média harmônica, por cor
 - Classes: Brilliant / Great / Best / Imprecisão / Erro / Miss / Blunder (limiares EPL 0,02 qualidade / 0,05 Best / 0,10 Imprecisão / 0,15 Erro; Miss/Brilliant/Great com regras adicionais)
+- Na abertura (fase do Divider do Lichess, não Book nem corte fixo de lances), Best / Great / Brilliant viram **Abertura** (sem glifo); erros e blunders continuam classificados
 - Hopeless (win% ≤ 10) → Forced, mas a precisão **ainda é calculada** e entra no agregado
 
 ## Comentários de IA (SIG-661)
