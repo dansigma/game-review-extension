@@ -2,6 +2,7 @@ import { Chess } from "chess.js";
 import { gameAccuracy, moveAccuracyFromWinPercents } from "./accuracy.ts";
 import { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
 import { meetsOnlyMoveGap } from "./onlyMove.ts";
+import { isTrivialHangingCapture } from "./hangingCapture.ts";
 import { isTrivialRecapture } from "./recapture.ts";
 import { isSacrifice } from "./sacrifice.ts";
 import {
@@ -153,9 +154,17 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
         { fenBefore: move.fenBefore, uci: move.uci },
         pv2?.pv[0],
       );
+    const trivialHangingCapture =
+      prevGameMove !== undefined &&
+      isTrivialHangingCapture(
+        { fenBefore: prevGameMove.fenBefore, uci: prevGameMove.uci },
+        { fenBefore: move.fenBefore, uci: move.uci },
+        pv2?.pv[0],
+      );
     const onlyMove =
       meetsOnlyMoveGap(playerWinBefore, alternativePlayerWinPercent) &&
       !trivialRecapture &&
+      !trivialHangingCapture &&
       !isHopeless(playerWinBefore);
     const previous = reviewed[i - 1];
     const previousOpponentEpl =
