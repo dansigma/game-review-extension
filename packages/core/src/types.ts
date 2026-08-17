@@ -1,5 +1,5 @@
-/** Accuracy curve unchanged (Lichess lila); v8 restores Imprecisão in the EPL classification ladder. */
-export const ALGO_VERSION = "lila-v8" as const;
+/** Accuracy curve unchanged (Lichess lila); v9 suppresses Best/Great/Brilliant in opening via Divider. */
+export const ALGO_VERSION = "lila-v9" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
@@ -11,6 +11,7 @@ export type MoveClass =
   | "brilliant"
   | "great"
   | "best"
+  | "opening"
   | "inaccuracy"
   | "mistake"
   | "miss"
@@ -21,6 +22,7 @@ export const MOVE_CLASS_LABEL_PT: Record<MoveClass, string> = {
   brilliant: "Brilliant",
   great: "Great",
   best: "Best",
+  opening: "Abertura",
   inaccuracy: "Imprecisão",
   mistake: "Erro",
   miss: "Miss",

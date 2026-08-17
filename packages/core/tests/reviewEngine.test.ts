@@ -78,20 +78,20 @@ describe("reviewGame on PGN fixtures", () => {
 
     expect(review.algoVersion).toBe(ALGO_VERSION);
     expect(review.moves.map((move) => move.classification)).toEqual([
-      "best",
-      "best",
+      "opening",
+      "opening",
       "inaccuracy",
       "mistake",
       "miss",
-      "best",
+      "opening",
     ]);
     expect(review.moves.map((move) => move.classificationLabel)).toEqual([
-      "Best",
-      "Best",
+      "Abertura",
+      "Abertura",
       "Imprecisão",
       "Erro",
       "Miss",
-      "Best",
+      "Abertura",
     ]);
     expect(review.moves[0]?.playedIsBest).toBe(true);
     expect(review.moves[1]?.playedIsBest).toBe(false);
@@ -193,7 +193,7 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.gameId).toBe("fixture1");
     expect(review.moves).toHaveLength(7);
     expect(review.moves[6]?.san).toBe("Qxf7#");
-    expect(review.moves[6]?.classification).toBe("great");
+    expect(review.moves[6]?.classification).toBe("opening");
   });
 
   it("rejects a wrong number of evals", () => {
@@ -243,7 +243,7 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.moves[0]?.playerWinPercentBefore).toBeCloseTo(pv1Win, 5);
     expect(review.moves[0]?.onlyMove).toBe(true);
     expect(isOnlyMove(review.moves[0]!)).toBe(true);
-    expect(review.moves[0]?.classification).toBe("great");
+    expect(review.moves[0]?.classification).toBe("opening");
   });
 
   it("does not flag only-move when PV1 and PV2 win% are close", () => {
@@ -618,7 +618,7 @@ describe("reviewGame on PGN fixtures", () => {
     expect(recaptureMove?.playedIsBest).toBe(true);
     expect(recaptureMove?.onlyMove).toBe(false);
     expect(isOnlyMove(recaptureMove!)).toBe(false);
-    expect(recaptureMove?.classification).toBe("best");
+    expect(recaptureMove?.classification).toBe("opening");
     expect(recaptureMove?.classification).not.toBe("great");
   });
 
@@ -680,7 +680,113 @@ describe("reviewGame on PGN fixtures", () => {
     expect(captureMove?.playedIsBest).toBe(true);
     expect(captureMove?.onlyMove).toBe(false);
     expect(isOnlyMove(captureMove!)).toBe(false);
-    expect(captureMove?.classification).toBe("best");
+    expect(captureMove?.classification).toBe("opening");
     expect(captureMove?.classification).not.toBe("great");
+  });
+
+  describe("opening phase filter", () => {
+    it("rewrites a first-ply Best to opening from the standard start", () => {
+      const game = parsePgn(`[Event "opening"]
+[White "w"]
+[Black "b"]
+
+1. d4`);
+      const firstMove = game.moves[0];
+      expect(firstMove?.uci).toBe("d2d4");
+
+      const evals: PositionEval[] = [
+        {
+          fen: game.initialFen,
+          ply: 0,
+          lines: [
+            line(1, { type: "cp", value: cpFromWinPercent(55) }, "d2d4"),
+            line(2, { type: "cp", value: cpFromWinPercent(54) }, "e2e4"),
+          ],
+        },
+        {
+          fen: firstMove?.fenAfter ?? "",
+          ply: 1,
+          lines: [
+            line(1, { type: "cp", value: cpFromWinPercent(50) }, "d7d5"),
+            line(2, { type: "cp", value: cpFromWinPercent(49) }, "g8f6"),
+          ],
+        },
+      ];
+
+      const review = reviewGame({ game, evals, engineId: "sf_18" });
+      expect(review.moves[0]?.playedIsBest).toBe(true);
+      expect(review.moves[0]?.classification).toBe("opening");
+      expect(review.moves[0]?.classificationLabel).toBe("Abertura");
+    });
+
+    it("keeps a first-ply blunder during the opening phase", () => {
+      const game = parsePgn(`[Event "opening-blunder"]
+[White "w"]
+[Black "b"]
+
+1. f3`);
+      const firstMove = game.moves[0];
+      expect(firstMove?.uci).toBe("f2f3");
+
+      const evals: PositionEval[] = [
+        {
+          fen: game.initialFen,
+          ply: 0,
+          lines: [
+            line(1, { type: "cp", value: cpFromWinPercent(55) }, "e2e4"),
+            line(2, { type: "cp", value: cpFromWinPercent(54) }, "d2d4"),
+          ],
+        },
+        {
+          fen: firstMove?.fenAfter ?? "",
+          ply: 1,
+          lines: [
+            line(1, { type: "cp", value: cpFromWinPercent(62) }, "e7e5"),
+            line(2, { type: "cp", value: cpFromWinPercent(60) }, "d7d5"),
+          ],
+        },
+      ];
+
+      const review = reviewGame({ game, evals, engineId: "sf_18" });
+      expect(review.moves[0]?.classification).toBe("blunder");
+    });
+
+    it("keeps Best after the Divider marks middlegame", () => {
+      const middlegameStart =
+        "rnbqk2r/pppp1ppp/5n2/8/8/5N2/PPPP1PPP/3RK2R w KQkq - 4 4";
+      const game = parsePgn(`[SetUp "1"]
+[FEN "${middlegameStart}"]
+[White "w"]
+[Black "b"]
+
+1. h3`);
+      const firstMove = game.moves[0];
+      expect(firstMove?.fenBefore).toBe(middlegameStart);
+      expect(firstMove?.uci).toBe("h2h3");
+
+      const evals: PositionEval[] = [
+        {
+          fen: game.initialFen,
+          ply: 0,
+          lines: [
+            line(1, { type: "cp", value: cpFromWinPercent(55) }, "h2h3"),
+            line(2, { type: "cp", value: cpFromWinPercent(54) }, "f1c4"),
+          ],
+        },
+        {
+          fen: firstMove?.fenAfter ?? "",
+          ply: 1,
+          lines: [
+            line(1, { type: "cp", value: cpFromWinPercent(50) }, "d7d6"),
+            line(2, { type: "cp", value: cpFromWinPercent(49) }, "g8f6"),
+          ],
+        },
+      ];
+
+      const review = reviewGame({ game, evals, engineId: "sf_18" });
+      expect(review.moves[0]?.playedIsBest).toBe(true);
+      expect(review.moves[0]?.classification).toBe("best");
+      expect(review.moves[0]?.classificationLabel).toBe("Best");
+    });
   });
 });

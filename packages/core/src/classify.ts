@@ -87,6 +87,21 @@ export function classifyMove(args: {
   return "blunder";
 }
 
+export function applyOpeningFilter(
+  classification: MoveClass,
+  isOpening: boolean,
+): MoveClass {
+  if (
+    isOpening &&
+    (classification === "brilliant" ||
+      classification === "great" ||
+      classification === "best")
+  ) {
+    return "opening";
+  }
+  return classification;
+}
+
 export function classificationLabel(classification: MoveClass): string {
   return MOVE_CLASS_LABEL_PT[classification];
 }

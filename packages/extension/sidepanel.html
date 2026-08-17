@@ -20,6 +20,7 @@
         --move-miss: #d7572b;
         --move-blunder: #ca3431;
         --move-forced: #888;
+        --move-opening: #888;
       }
       body {
         margin: 0;
@@ -310,6 +311,7 @@
       .move-blunder .move-san,
       .move-blunder .move-glyph { color: var(--move-blunder); }
       .move-forced .move-san { color: var(--move-forced); }
+      .move-opening .move-san { color: var(--move-opening); }
       .move-only-badge {
         font-size: 9px;
         font-weight: 600;
@@ -518,6 +520,9 @@
       }
       .comment-slice-header.move-forced .comment-slice-san {
         color: var(--move-forced);
+      }
+      .comment-slice-header.move-opening .comment-slice-san {
+        color: var(--move-opening);
       }
       .comment-slice-judgement {
         margin: 0;

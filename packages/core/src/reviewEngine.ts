@@ -1,6 +1,12 @@
 import { Chess } from "chess.js";
 import { gameAccuracy, moveAccuracyFromWinPercents } from "./accuracy.ts";
-import { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
+import {
+  applyOpeningFilter,
+  classificationLabel,
+  classifyMove,
+  isHopeless,
+} from "./classify.ts";
+import { divideGame, isOpeningPly } from "./divider.ts";
 import { meetsOnlyMoveGap } from "./onlyMove.ts";
 import { isTrivialHangingCapture } from "./hangingCapture.ts";
 import { isTrivialRecapture } from "./recapture.ts";
@@ -113,6 +119,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
 
   const reviewed: ReviewedMove[] = [];
   const graph: EvalGraphPoint[] = [];
+  const division = divideGame(game.moves.map((move) => move.fenAfter));
 
   const start = evals[0];
   if (!start) {
@@ -169,7 +176,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
     const previous = reviewed[i - 1];
     const previousOpponentEpl =
       previous && previous.color !== move.color ? previous.epl : undefined;
-    const classification = classifyMove({
+    const rawClassification = classifyMove({
       epl,
       playedIsBest,
       playerWinPercentBefore: playerWinBefore,
@@ -178,6 +185,10 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       isSacrifice: isSacrifice(move.fenBefore, move.uci),
       previousOpponentEpl,
     });
+    const classification = applyOpeningFilter(
+      rawClassification,
+      isOpeningPly(division, move.ply),
+    );
     const accuracy = moveAccuracyFromWinPercents(
       playerWinBefore,
       playerWinAfter,
