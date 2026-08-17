@@ -44,7 +44,7 @@ Formato: `gameId|algoVersion|engineId|nodesPerPosition`. Mudar `ALGO_VERSION` in
 
 ## Orçamento do motor (SIG-652)
 
-Padrão: `go nodes 400000`, MultiPV=2, Threads=2, `sf_18` (NNUE completo) no documento offscreen.
+Padrão: `go nodes 400000`, MultiPV=2, Threads=4, `sf_18` (NNUE completo) no documento offscreen.
 Presets: Rápido 80k, Padrão 400k, Profundo 1,5M. WASM com 1 thread não reproduz bitwise o fishnet do Lichess (~1,5M nodes, nativo). A análise roda em um documento offscreen: fechar o Side Panel **não** cancela; o botão **Cancelar** cancela. Cache continua no IndexedDB.
 
 ## Precisão (`lila-v5`)
