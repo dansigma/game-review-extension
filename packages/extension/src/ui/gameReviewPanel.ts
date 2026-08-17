@@ -189,6 +189,12 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
 
 const PRESET_IDS: EngineQualityPresetId[] = ["fast", "standard", "deep"];
 
+type StoredAiComment = {
+  ply: number;
+  text: string;
+  kind: "loading" | "ok" | "error";
+};
+
 function fillPresetSelect(select: HTMLSelectElement): void {
   const selected = isEngineQualityPresetId(select.value)
     ? select.value
@@ -212,7 +218,7 @@ export class GameReviewPanel {
   private judgementCycleIndex = new Map<string, number>();
   private moveListFilter: MoveListFilter = null;
   private enginePreviewIndex: number | null = null;
-  private commentInFlight = false;
+  private storedAiComment: StoredAiComment | null = null;
   private onAnalyze: (() => void) | null = null;
   private onReanalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
@@ -271,6 +277,7 @@ export class GameReviewPanel {
     this.review = null;
     this.currentPly = -1;
     this.enginePreviewIndex = null;
+    this.storedAiComment = null;
     this.moveListFilter = null;
     if (!game) {
       this.el.reviewSection.hidden = true;
@@ -307,6 +314,7 @@ export class GameReviewPanel {
     this.game = game;
     this.currentPly = -1;
     this.enginePreviewIndex = null;
+    this.storedAiComment = null;
     this.moveListFilter = null;
     this.judgementCycleIndex.clear();
     this.classPlies = buildClassPlies(review.moves);
@@ -687,7 +695,6 @@ export class GameReviewPanel {
       commentSliceBody,
       commentSliceButton,
       commentSliceProxyHint,
-      commentSliceAi,
     } = this.el;
 
     if (!this.review || this.currentPly < 0) {
@@ -698,9 +705,7 @@ export class GameReviewPanel {
       commentSliceButton.disabled = true;
       commentSliceButton.title = "";
       commentSliceProxyHint.hidden = true;
-      commentSliceAi.hidden = true;
-      commentSliceAi.replaceChildren();
-      commentSliceAi.className = "";
+      this.renderCommentAi();
       return;
     }
 
@@ -713,9 +718,7 @@ export class GameReviewPanel {
       commentSliceButton.disabled = true;
       commentSliceButton.title = "";
       commentSliceProxyHint.hidden = true;
-      commentSliceAi.hidden = true;
-      commentSliceAi.replaceChildren();
-      commentSliceAi.className = "";
+      this.renderCommentAi();
       return;
     }
 
@@ -765,21 +768,38 @@ export class GameReviewPanel {
     commentSliceBody.append(...children);
 
     const proxyConfigured = isCommentProxyConfigured();
+    const commentLoading = this.storedAiComment?.kind === "loading";
     commentSliceProxyHint.hidden = proxyConfigured;
     commentSliceButton.textContent = "Comentar";
-    commentSliceButton.disabled = !proxyConfigured || this.commentInFlight;
+    commentSliceButton.disabled = !proxyConfigured || commentLoading;
     commentSliceButton.title = proxyConfigured ? "" : "Proxy não configurado";
+    this.renderCommentAi();
+  }
 
-    if (!this.commentInFlight) {
+  private renderCommentAi(): void {
+    const { commentSliceAi } = this.el;
+    const stored = this.storedAiComment;
+
+    if (!stored || stored.ply !== this.currentPly) {
       commentSliceAi.hidden = true;
-      commentSliceAi.replaceChildren();
+      commentSliceAi.textContent = "";
       commentSliceAi.className = "";
+      return;
     }
+
+    commentSliceAi.hidden = false;
+    commentSliceAi.textContent = stored.text;
+    commentSliceAi.className =
+      stored.kind === "loading"
+        ? "comment-slice-ai-loading"
+        : stored.kind === "error"
+          ? "comment-slice-ai-error"
+          : "";
   }
 
   private async onCommentClick(): Promise<void> {
     if (
-      this.commentInFlight ||
+      this.storedAiComment?.kind === "loading" ||
       !this.review ||
       this.currentPly < 0 ||
       !isCommentProxyConfigured()
@@ -792,30 +812,36 @@ export class GameReviewPanel {
       return;
     }
 
-    const { commentSliceButton, commentSliceAi } = this.el;
-    this.commentInFlight = true;
-    commentSliceButton.disabled = true;
-    commentSliceAi.hidden = false;
-    commentSliceAi.textContent = "Comentando…";
-    commentSliceAi.className = "comment-slice-ai-loading";
+    this.storedAiComment = {
+      ply: this.currentPly,
+      text: "Comentando…",
+      kind: "loading",
+    };
+    this.refreshView();
 
     try {
       const comment = await requestComment(slice);
-      commentSliceAi.textContent = comment;
-      commentSliceAi.className = "";
+      if (this.currentPly === slice.ply) {
+        this.storedAiComment = {
+          ply: slice.ply,
+          text: comment,
+          kind: "ok",
+        };
+      }
     } catch (error) {
-      const message =
-        error instanceof CommentProxyError
-          ? error.message
-          : "Não foi possível obter o comentário.";
-      commentSliceAi.textContent = message;
-      commentSliceAi.className = "comment-slice-ai-error";
+      if (this.currentPly === slice.ply) {
+        const message =
+          error instanceof CommentProxyError
+            ? error.message
+            : "Não foi possível obter o comentário.";
+        this.storedAiComment = {
+          ply: slice.ply,
+          text: message,
+          kind: "error",
+        };
+      }
     } finally {
-      this.commentInFlight = false;
-      commentSliceButton.disabled = !isCommentProxyConfigured();
-      commentSliceButton.title = isCommentProxyConfigured()
-        ? ""
-        : "Proxy não configurado";
+      this.refreshView();
     }
   }
 
@@ -996,7 +1022,11 @@ export class GameReviewPanel {
   private goToPly(ply: number): void {
     this.clearEnginePreview();
     const max = (this.game?.moves.length ?? 0) - 1;
-    this.currentPly = Math.max(-1, Math.min(max, ply));
+    const nextPly = Math.max(-1, Math.min(max, ply));
+    if (this.storedAiComment !== null && this.storedAiComment.ply !== nextPly) {
+      this.storedAiComment = null;
+    }
+    this.currentPly = nextPly;
     this.refreshView();
   }
 

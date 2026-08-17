@@ -1,7 +1,5 @@
 import type { CommentSlice } from "@game-review/core";
 
-const RAW_PROXY_URL = import.meta.env.VITE_COMMENT_PROXY_URL?.trim() ?? "";
-
 export class CommentProxyError extends Error {
   constructor(message: string) {
     super(message);
@@ -9,15 +7,20 @@ export class CommentProxyError extends Error {
   }
 }
 
+export function proxyUrlFromEnv(): string {
+  return import.meta.env.VITE_COMMENT_PROXY_URL?.trim() ?? "";
+}
+
 export function isCommentProxyConfigured(): boolean {
-  return RAW_PROXY_URL.length > 0;
+  return proxyUrlFromEnv().length > 0;
 }
 
 export function getCommentProxyBaseUrl(): string | null {
-  if (!isCommentProxyConfigured()) {
+  const raw = proxyUrlFromEnv();
+  if (!raw) {
     return null;
   }
-  return RAW_PROXY_URL.replace(/\/+$/, "");
+  return raw.replace(/\/+$/, "");
 }
 
 function commentEndpoint(baseUrl: string): string {
