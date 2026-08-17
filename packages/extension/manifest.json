@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Análise pós-partida no Lichess e Chess.com. Stockfish local. GPL-3.0.",
   "minimum_chrome_version": "116",
-  "permissions": ["sidePanel", "tabs", "storage"],
+  "permissions": ["sidePanel", "tabs", "storage", "offscreen"],
   "host_permissions": [
     "https://lichess.org/*",
     "https://www.chess.com/*",
