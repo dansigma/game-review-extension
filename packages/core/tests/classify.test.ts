@@ -190,7 +190,7 @@ describe("classifyMove", () => {
     ).toBe("great");
   });
 
-  it("maps EPL to Best / Erro / Blunder", () => {
+  it("maps EPL to Best / Imprecisão / Erro / Blunder", () => {
     expect(
       classifyMove(baseArgs({ epl: 0, playedIsBest: true })),
     ).toBe("best");
@@ -203,7 +203,7 @@ describe("classifyMove", () => {
       classifyMove(
         baseArgs({ epl: 0.08, playedIsBest: false, playerWinPercentAfter: 42 }),
       ),
-    ).toBe("mistake");
+    ).toBe("inaccuracy");
     expect(
       classifyMove(
         baseArgs({ epl: 0.12, playedIsBest: false, playerWinPercentAfter: 38 }),

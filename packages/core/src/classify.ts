@@ -78,6 +78,9 @@ export function classifyMove(args: {
   if (args.playedIsBest || args.epl < EPL_THRESHOLDS.bestBandMax) {
     return "best";
   }
+  if (args.epl < EPL_THRESHOLDS.inaccuracy) {
+    return "inaccuracy";
+  }
   if (args.epl < EPL_THRESHOLDS.mistake) {
     return "mistake";
   }

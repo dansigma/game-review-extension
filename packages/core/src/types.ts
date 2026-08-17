@@ -1,5 +1,5 @@
-/** Accuracy curve unchanged (Lichess lila); move-class ladder simplified in v7 (trivial hanging-capture only-move filter). */
-export const ALGO_VERSION = "lila-v7" as const;
+/** Accuracy curve unchanged (Lichess lila); v8 restores Imprecisão in the EPL classification ladder. */
+export const ALGO_VERSION = "lila-v8" as const;
 
 export type AlgoVersion = typeof ALGO_VERSION;
 
@@ -11,6 +11,7 @@ export type MoveClass =
   | "brilliant"
   | "great"
   | "best"
+  | "inaccuracy"
   | "mistake"
   | "miss"
   | "blunder"
@@ -20,6 +21,7 @@ export const MOVE_CLASS_LABEL_PT: Record<MoveClass, string> = {
   brilliant: "Brilliant",
   great: "Great",
   best: "Best",
+  inaccuracy: "Imprecisão",
   mistake: "Erro",
   miss: "Miss",
   blunder: "Blunder",
@@ -35,6 +37,8 @@ export const EPL_THRESHOLDS = {
   best: 0.02,
   /** Upper EPL for Best class (non-forced ladder). */
   bestBandMax: 0.05,
+  /** Upper EPL for Imprecisão class. */
+  inaccuracy: 0.1,
   /** Previous opponent EPL required to qualify for Miss (not a move class). */
   missPreviousOpponent: 0.1,
   mistake: 0.15,

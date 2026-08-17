@@ -37,7 +37,7 @@ describe("selectCriticalMoments", () => {
     expect(result[0]?.ply).toBe(1);
   });
 
-  it("never selects Best, Great or other non-critical moves", () => {
+  it("never selects Best, Great, Imprecisão or other non-critical moves", () => {
     const moves = [
       fakeMove({
         ply: 0,
@@ -48,6 +48,12 @@ describe("selectCriticalMoments", () => {
       }),
       fakeMove({ ply: 1, color: "black", epl: 0.04, classification: "best" }),
       fakeMove({ ply: 2, color: "white", epl: 0.01, classification: "great" }),
+      fakeMove({
+        ply: 6,
+        color: "white",
+        epl: 0.08,
+        classification: "inaccuracy",
+      }),
       fakeMove({ ply: 3, color: "black", epl: 0.12, classification: "mistake" }),
       fakeMove({ ply: 4, color: "white", epl: 0.14, classification: "miss" }),
     ];
@@ -115,7 +121,7 @@ describe("selectCriticalMoments", () => {
 });
 
 describe("countJudgements", () => {
-  it("counts best, mistake and blunder per color", () => {
+  it("counts best, inaccuracy, mistake and blunder per color", () => {
     const moves = [
       fakeMove({ ply: 0, color: "white", epl: 0.1, classification: "mistake" }),
       fakeMove({ ply: 2, color: "white", epl: 0.12, classification: "mistake" }),
@@ -127,12 +133,25 @@ describe("countJudgements", () => {
       fakeMove({ ply: 7, color: "white", epl: 0.01, classification: "best" }),
       fakeMove({ ply: 8, color: "black", epl: 0.5, classification: "forced" }),
       fakeMove({ ply: 9, color: "black", epl: 0.03, classification: "best" }),
+      fakeMove({
+        ply: 10,
+        color: "white",
+        epl: 0.08,
+        classification: "inaccuracy",
+      }),
+      fakeMove({
+        ply: 11,
+        color: "black",
+        epl: 0.07,
+        classification: "inaccuracy",
+      }),
     ];
     expect(countJudgements(moves)).toEqual({
       white: {
         brilliant: 0,
         great: 0,
         best: 1,
+        inaccuracy: 1,
         mistake: 2,
         miss: 0,
         blunder: 1,
@@ -141,6 +160,7 @@ describe("countJudgements", () => {
         brilliant: 0,
         great: 0,
         best: 1,
+        inaccuracy: 1,
         mistake: 2,
         miss: 0,
         blunder: 2,

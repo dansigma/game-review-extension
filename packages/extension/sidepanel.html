@@ -15,6 +15,7 @@
         --move-brilliant: #1baca6;
         --move-great: #5b8cbb;
         --move-best: #81b64c;
+        --move-inaccuracy: #56b4e9;
         --move-mistake: #e58f2a;
         --move-miss: #d7572b;
         --move-blunder: #ca3431;
@@ -228,6 +229,10 @@
       .class-dashboard-row.move-best .class-dashboard-glyph {
         color: var(--move-best);
       }
+      .class-dashboard-row.move-inaccuracy .class-dashboard-count,
+      .class-dashboard-row.move-inaccuracy .class-dashboard-glyph {
+        color: var(--move-inaccuracy);
+      }
       .class-dashboard-row.move-mistake .class-dashboard-count,
       .class-dashboard-row.move-mistake .class-dashboard-glyph {
         color: var(--move-mistake);
@@ -296,6 +301,8 @@
       .move-great .move-glyph { color: var(--move-great); }
       .move-best .move-san,
       .move-best .move-glyph { color: var(--move-best); }
+      .move-inaccuracy .move-san,
+      .move-inaccuracy .move-glyph { color: var(--move-inaccuracy); }
       .move-mistake .move-san,
       .move-mistake .move-glyph { color: var(--move-mistake); }
       .move-miss .move-san,
@@ -411,6 +418,9 @@
       .critical-moment-btn.move-best .critical-moment-move {
         color: var(--move-best);
       }
+      .critical-moment-btn.move-inaccuracy .critical-moment-move {
+        color: var(--move-inaccuracy);
+      }
       .critical-moment-color,
       .critical-moment-eval {
         font-size: 11px;
@@ -441,6 +451,9 @@
       }
       .critical-moment-btn.move-best .critical-moment-class {
         color: var(--move-best);
+      }
+      .critical-moment-btn.move-inaccuracy .critical-moment-class {
+        color: var(--move-inaccuracy);
       }
       .comment-slice {
         display: grid;
@@ -490,6 +503,9 @@
       }
       .comment-slice-header.move-best .comment-slice-san {
         color: var(--move-best);
+      }
+      .comment-slice-header.move-inaccuracy .comment-slice-san {
+        color: var(--move-inaccuracy);
       }
       .comment-slice-header.move-mistake .comment-slice-san {
         color: var(--move-mistake);

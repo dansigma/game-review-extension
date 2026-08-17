@@ -10,6 +10,7 @@ const ALL_CLASSES: MoveClass[] = [
   "brilliant",
   "great",
   "best",
+  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
@@ -21,6 +22,7 @@ describe("classificationGlyph", () => {
     expect(classificationGlyph("brilliant")).toBe("!!");
     expect(classificationGlyph("great")).toBe("!");
     expect(classificationGlyph("best")).toBe("★");
+    expect(classificationGlyph("inaccuracy")).toBe("?!");
     expect(classificationGlyph("mistake")).toBe("?");
     expect(classificationGlyph("miss")).toBe("");
     expect(classificationGlyph("blunder")).toBe("??");
@@ -70,6 +72,9 @@ describe("judgementComment", () => {
 
   it("falls back when bestSan is missing", () => {
     expect(
+      judgementComment({ classification: "inaccuracy", playedIsBest: false }),
+    ).toBe("Imprecisão.");
+    expect(
       judgementComment({ classification: "mistake", playedIsBest: false }),
     ).toBe("Erro.");
     expect(
@@ -80,7 +85,14 @@ describe("judgementComment", () => {
     ).toBe("Blunder.");
   });
 
-  it("includes bestSan for mistake, miss and blunder", () => {
+  it("includes bestSan for inaccuracy, mistake, miss and blunder", () => {
+    expect(
+      judgementComment({
+        classification: "inaccuracy",
+        bestSan: "Nc3",
+        playedIsBest: false,
+      }),
+    ).toBe("Imprecisão. Melhor era Nc3.");
     expect(
       judgementComment({
         classification: "mistake",

@@ -44,6 +44,7 @@ const CLASS_CSS: Record<MoveClass, string> = {
   brilliant: "move-brilliant",
   great: "move-great",
   best: "move-best",
+  inaccuracy: "move-inaccuracy",
   mistake: "move-mistake",
   miss: "move-miss",
   blunder: "move-blunder",
@@ -863,6 +864,15 @@ export class GameReviewPanel {
         break;
       case "best":
         appendText("Melhor lance.");
+        break;
+      case "inaccuracy":
+        if (bestSan) {
+          appendText("Imprecisão. Melhor era ");
+          frag.appendChild(this.createEngineSanButton(bestSan, bestIndex ?? 0));
+          appendText(".");
+        } else {
+          appendText("Imprecisão.");
+        }
         break;
       case "mistake":
         if (bestSan) {

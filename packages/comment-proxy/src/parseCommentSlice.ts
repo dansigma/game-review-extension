@@ -20,6 +20,7 @@ const MOVE_CLASSES: readonly MoveClass[] = [
   "brilliant",
   "great",
   "best",
+  "inaccuracy",
   "mistake",
   "miss",
   "blunder",
