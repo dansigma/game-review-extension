@@ -586,4 +586,66 @@ describe("reviewGame on PGN fixtures", () => {
     expect(recaptureMove?.classification).toBe("best");
     expect(recaptureMove?.classification).not.toBe("great");
   });
+
+  it("does not flag only-move or Great for trivial hanging capture despite large PV gap", () => {
+    const game = parsePgn(`[SetUp "1"]
+[FEN "rnbqkb1r/pppp1ppp/5n2/8/8/5B2/PPPP1PPP/RNBQK1NR b KQkq - 0 5"]
+[White "w"]
+[Black "b"]
+
+1. Ne4 Bxe4`);
+    const blackHang = game.moves[0];
+    const whiteCapture = game.moves[1];
+    expect(blackHang?.uci).toBe("f6e4");
+    expect(whiteCapture?.uci).toBe("f3e4");
+
+    const subsetGame = {
+      ...game,
+      initialFen: game.initialFen,
+      moves: [blackHang!, whiteCapture!],
+    };
+
+    const pv1Win = 62;
+    const pv2Win = 48;
+    const afterWin = 64;
+    const evals: PositionEval[] = [
+      {
+        fen: subsetGame.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(50) }, "f6e4"),
+          line(2, { type: "cp", value: cpFromWinPercent(49) }, "c7c5"),
+        ],
+      },
+      {
+        fen: whiteCapture!.fenBefore,
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(pv1Win) }, "f3e4"),
+          line(2, { type: "cp", value: cpFromWinPercent(pv2Win) }, "c2c3"),
+        ],
+      },
+      {
+        fen: whiteCapture!.fenAfter,
+        ply: 2,
+        lines: [
+          line(1, { type: "cp", value: cpFromWinPercent(100 - afterWin) }, "g8f6"),
+          line(2, { type: "cp", value: cpFromWinPercent(100 - afterWin - 5) }, "d7d6"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: subsetGame,
+      evals,
+      engineId: "sf_18",
+    });
+
+    const captureMove = review.moves[1];
+    expect(captureMove?.playedIsBest).toBe(true);
+    expect(captureMove?.onlyMove).toBe(false);
+    expect(isOnlyMove(captureMove!)).toBe(false);
+    expect(captureMove?.classification).toBe("best");
+    expect(captureMove?.classification).not.toBe("great");
+  });
 });

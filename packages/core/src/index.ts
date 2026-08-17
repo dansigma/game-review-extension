@@ -62,6 +62,12 @@ export type {
   JudgementsByColor,
 } from "./criticalMoments.ts";
 export {
+  isNewlyHangingCapture,
+  isTrivialHangingCapture,
+  squareSee,
+  wasWinningCaptureOnSquare,
+} from "./hangingCapture.ts";
+export {
   isCapture,
   isRecapture,
   isTrivialRecapture,
