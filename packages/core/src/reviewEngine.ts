@@ -186,6 +186,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
     const bestUci = pv1.pv[0] ?? move.uci;
     const bestSan = uciToSan(move.fenBefore, bestUci);
     const bestLineSan = uciPvToSan(move.fenBefore, pv1.pv);
+    const replyLineSan = uciPvToSan(move.fenAfter, afterBest.pv);
 
     reviewed.push({
       ply: move.ply,
@@ -204,6 +205,8 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
       bestUci,
       ...(bestSan !== undefined ? { bestSan } : {}),
       ...(bestLineSan !== undefined ? { bestLineSan } : {}),
+      ...(replyLineSan !== undefined ? { replyLineSan } : {}),
+      fenAfter: move.fenAfter,
       playedIsBest,
       alternativeUci: pv2?.pv[0],
       alternativePlayerWinPercent,

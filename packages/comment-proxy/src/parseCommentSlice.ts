@@ -48,6 +48,8 @@ const OPTIONAL_KEYS: readonly (keyof CommentSlice)[] = [
   "evalBefore",
   "bestSan",
   "engineLine",
+  "replyLine",
+  "fenAfter",
 ];
 
 const ALLOWED_KEYS = new Set<string>([...REQUIRED_KEYS, ...OPTIONAL_KEYS]);
@@ -127,6 +129,8 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
     evalBefore,
     bestSan,
     engineLine,
+    replyLine,
+    fenAfter,
   } = body;
 
   if (!isString(gameId) || gameId.length === 0) {
@@ -177,6 +181,12 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   if (engineLine !== undefined && !isString(engineLine)) {
     return { ok: false, error: "engineLine inválido." };
   }
+  if (replyLine !== undefined && !isString(replyLine)) {
+    return { ok: false, error: "replyLine inválido." };
+  }
+  if (fenAfter !== undefined && (!isString(fenAfter) || !fenAfter.includes("/"))) {
+    return { ok: false, error: "fenAfter inválido." };
+  }
 
   const slice: CommentSlice = {
     gameId,
@@ -195,6 +205,8 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
     ...(evalBefore !== undefined ? { evalBefore } : {}),
     ...(bestSan !== undefined ? { bestSan } : {}),
     ...(engineLine !== undefined ? { engineLine } : {}),
+    ...(replyLine !== undefined ? { replyLine } : {}),
+    ...(fenAfter !== undefined ? { fenAfter } : {}),
   };
 
   return { ok: true, slice };

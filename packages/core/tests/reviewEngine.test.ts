@@ -397,6 +397,41 @@ describe("reviewGame on PGN fixtures", () => {
     expect(review.moves[0]?.bestLineSan).toBe("e4 e5 Nf3 Nc6 Bb5");
   });
 
+  it("persists replyLineSan from PV1 after the ply", () => {
+    const game = parsePgn(fixture("classification-coverage.pgn"));
+    const firstMove = game.moves[0];
+    expect(firstMove).toBeDefined();
+
+    const evals: PositionEval[] = [
+      {
+        fen: game.initialFen,
+        ply: 0,
+        lines: [
+          line(1, { type: "cp", value: 50 }, "e2e4"),
+          line(2, { type: "cp", value: 30 }, "d2d4"),
+        ],
+      },
+      {
+        fen: firstMove?.fenAfter ?? "",
+        ply: 1,
+        lines: [
+          line(1, { type: "cp", value: 40 }, ["e7e5", "g1f3", "b8c6"]),
+          line(2, { type: "cp", value: 20 }, "c7c5"),
+        ],
+      },
+    ];
+
+    const review = reviewGame({
+      game: { ...game, moves: game.moves.slice(0, 1) },
+      evals,
+      engineId: "sf_18",
+    });
+
+    expect(review.moves[0]?.replyLineSan).toBe("e5 Nf3 Nc6");
+    expect(review.moves[0]?.replyLineSan).not.toMatch(/[a-h][1-8][a-h][1-8]/);
+    expect(review.moves[0]?.fenAfter).toBe(firstMove?.fenAfter);
+  });
+
   it(`caps bestLineSan at ${ENGINE_PV_SAN_MAX} SAN plies`, () => {
     const game = parsePgn(fixture("classification-coverage.pgn"));
     const firstMove = game.moves[0];

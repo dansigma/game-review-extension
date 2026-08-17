@@ -35,8 +35,14 @@ export {
   weightedMean,
 } from "./accuracy.ts";
 export type { GameAccuracyResult } from "./accuracy.ts";
-export { buildCommentSlice } from "./commentSlice.ts";
+export { buildCommentSlice, REPLY_LINE_SAN_MAX } from "./commentSlice.ts";
 export type { CommentSlice } from "./commentSlice.ts";
+export {
+  buildCommentBoardFacts,
+  describeReplyCaptures,
+  formatCommentBoardFacts,
+} from "./commentBoardFacts.ts";
+export type { CommentBoardFacts, CommentBoardFactsInput } from "./commentBoardFacts.ts";
 export { classificationLabel, classifyMove, isHopeless } from "./classify.ts";
 export {
   evalAfterCaptures,

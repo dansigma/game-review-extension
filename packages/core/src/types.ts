@@ -117,6 +117,10 @@ export interface ReviewedMove {
   bestSan?: string;
   /** Up to 5 SAN plies of engine PV1 before the ply; omitted when conversion fails. */
   bestLineSan?: string;
+  /** SAN of engine PV1 after the played move (opponent's reply); omitted when conversion fails. */
+  replyLineSan?: string;
+  /** Position after this ply; omitted in legacy cached reviews. */
+  fenAfter?: string;
   playedIsBest: boolean;
   alternativeUci?: string;
   /** Side-to-move win% for MultiPV line 2 before the played move; absent when PV2 missing. */

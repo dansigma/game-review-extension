@@ -133,6 +133,74 @@ describe("buildCommentSlice", () => {
     expect(slice).not.toHaveProperty("engineLine");
   });
 
+  it("includes replyLine from replyLineSan, capped at 3 SAN plies", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 18,
+        color: "black",
+        san: "Qc7",
+        classification: "blunder",
+        replyLineSan: "Qxc7+ Kd8 Qxd8+",
+        playedIsBest: false,
+      }),
+    ]);
+
+    expect(buildCommentSlice(review, 18)?.replyLine).toBe("Qxc7+ Kd8 Qxd8+");
+  });
+
+  it("falls back to the next ply bestLineSan when replyLineSan is missing", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 18,
+        color: "black",
+        san: "Qc7",
+        classification: "blunder",
+        bestSan: "Rd8",
+        playedIsBest: false,
+      }),
+      fakeMove({
+        ply: 19,
+        color: "white",
+        san: "Qe2",
+        bestSan: "Qxc7+",
+        bestLineSan: "Qxc7+ Kd8 Nf3",
+      }),
+    ]);
+
+    expect(buildCommentSlice(review, 18)?.replyLine).toBe("Qxc7+ Kd8 Nf3");
+  });
+
+  it("includes fenAfter when present and never a `fen` key", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 18,
+        color: "black",
+        san: "Qc7",
+        fenAfter: "8/2q5/8/8/8/2Q5/8/8 w - - 0 1",
+      }),
+    ]);
+    const slice = buildCommentSlice(review, 18);
+    expect(slice?.fenAfter).toBe("8/2q5/8/8/8/2Q5/8/8 w - - 0 1");
+    expect(slice).not.toHaveProperty("fen");
+  });
+
+  it("omits replyLine when there is no replyLineSan and no next ply", () => {
+    const review = stubReview([fakeMove({ ply: 0, color: "white" })]);
+    expect(buildCommentSlice(review, 0)).not.toHaveProperty("replyLine");
+  });
+
+  it("caps replyLine at 3 SAN plies", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 0,
+        color: "white",
+        replyLineSan: "Qxc7+ Kd8 Qxd8+ Kxd8 Nf3",
+      }),
+    ]);
+
+    expect(buildCommentSlice(review, 0)?.replyLine).toBe("Qxc7+ Kd8 Qxd8+");
+  });
+
   it("engineLine is SAN-shaped, not UCI", () => {
     const review = stubReview([
       fakeMove({
