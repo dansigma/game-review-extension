@@ -74,6 +74,16 @@ export {
 } from "./nag.ts";
 export type { JudgementCommentArgs } from "./nag.ts";
 export {
+  COMMENT_PLY_MIN_GAP,
+  isMandatoryCommentPly,
+  selectCommentPlies,
+} from "./commentPlies.ts";
+export type {
+  CommentPly,
+  CommentPlyKind,
+  SelectCommentPliesOptions,
+} from "./commentPlies.ts";
+export {
   CRITICAL_EPL_MIN,
   DASHBOARD_CLASSES,
   countJudgements,

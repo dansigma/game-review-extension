@@ -6,6 +6,7 @@ import {
   DASHBOARD_CLASSES,
   formatSanWithGlyph,
   formatMoveEvalAfter,
+  isMandatoryCommentPly,
   isOnlyMove,
   MOVE_CLASS_LABEL_PT,
   selectCriticalMoments,
@@ -716,6 +717,8 @@ export class GameReviewPanel {
       commentSliceBody.hidden = true;
       commentSliceBody.replaceChildren();
       commentSliceButton.disabled = true;
+      commentSliceButton.textContent = "Comentar";
+      commentSliceButton.classList.remove("comment-slice-button-highlight");
       commentSliceButton.title = "";
       commentSliceProxyHint.hidden = true;
       this.renderCommentAi();
@@ -729,6 +732,8 @@ export class GameReviewPanel {
       commentSliceBody.hidden = true;
       commentSliceBody.replaceChildren();
       commentSliceButton.disabled = true;
+      commentSliceButton.textContent = "Comentar";
+      commentSliceButton.classList.remove("comment-slice-button-highlight");
       commentSliceButton.title = "";
       commentSliceProxyHint.hidden = true;
       this.renderCommentAi();
@@ -782,8 +787,13 @@ export class GameReviewPanel {
 
     const proxyConfigured = isCommentProxyConfigured();
     const commentLoading = this.storedAiComment?.kind === "loading";
+    const mandatoryCommentPly = isMandatoryCommentPly(this.review, this.currentPly);
     commentSliceProxyHint.hidden = proxyConfigured;
-    commentSliceButton.textContent = "Comentar";
+    commentSliceButton.textContent = mandatoryCommentPly ? "Comentar isto" : "Comentar";
+    commentSliceButton.classList.toggle(
+      "comment-slice-button-highlight",
+      mandatoryCommentPly,
+    );
     commentSliceButton.disabled = !proxyConfigured || commentLoading;
     commentSliceButton.title = proxyConfigured ? "" : "Proxy não configurado";
     this.renderCommentAi();
