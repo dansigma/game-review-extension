@@ -7,7 +7,7 @@ import {
   type MoveClass,
 } from "@game-review/core";
 
-const SHARED_BASE =
+export const SHARED_BASE =
   "Você é um treinador de xadrez para crianças de uns 10 anos. Fale em português do Brasil, " +
   "em 2 ou 3 frases curtas, como um adulto paciente no clube — nunca como um computador. " +
   "Palavras simples e diretas. Não use diminutivos (errinho, jogadinha, presentinho). " +

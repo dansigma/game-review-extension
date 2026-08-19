@@ -52,6 +52,14 @@ export {
   formatCommentBoardFacts,
 } from "./commentBoardFacts.ts";
 export { buildFallbackComment } from "./fallbackComment.ts";
+export { buildFallbackGameSummary } from "./fallbackGameSummary.ts";
+export {
+  buildGameSummarySlice,
+} from "./gameSummarySlice.ts";
+export type {
+  GameSummaryMoment,
+  GameSummarySlice,
+} from "./gameSummarySlice.ts";
 export type { CommentBoardFacts, CommentBoardFactsInput } from "./commentBoardFacts.ts";
 export {
   applyOpeningFilter,

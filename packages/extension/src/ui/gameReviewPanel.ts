@@ -1,6 +1,8 @@
 import {
   buildCommentSlice,
   buildFallbackComment,
+  buildFallbackGameSummary,
+  buildGameSummarySlice,
   classificationGlyph,
   countJudgements,
   DASHBOARD_CLASSES,
@@ -33,7 +35,14 @@ import {
   isCommentProxyConfigured,
   isCommentUsable,
   requestComment,
+  requestGameSummary,
 } from "../commentProxy.ts";
+import {
+  getCachedSummary,
+  putCachedSummary,
+  summaryCacheKey,
+  type SummaryCacheSource,
+} from "../summaryCache.ts";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
 import { previewEngineLineMove } from "./engineLinePreview.ts";
 import { renderEvalGraph } from "./evalGraph.ts";
@@ -66,6 +75,7 @@ export interface GameReviewPanelElements {
   resultsBlock: HTMLElement;
   summaryResult: HTMLElement;
   summaryAccuracy: HTMLElement;
+  gameSummary: HTMLElement;
   summaryJudgements: HTMLElement;
   boardHost: HTMLElement;
   evalCanvas: HTMLCanvasElement;
@@ -167,6 +177,7 @@ export function queryGameReviewPanel(root: ParentNode): GameReviewPanelElements 
     resultsBlock: requireEl("#review-results"),
     summaryResult: requireEl("#review-summary-result"),
     summaryAccuracy: requireEl("#review-summary-accuracy"),
+    gameSummary: requireEl("#review-game-summary"),
     summaryJudgements: requireEl("#review-summary-judgements"),
     boardHost: requireEl("#board-host"),
     evalCanvas,
@@ -201,6 +212,11 @@ type StoredAiComment = {
 
 const FALLBACK_COMMENT_LABEL = "Texto automático (sem IA)";
 
+type GameSummaryState =
+  | { kind: "loading" }
+  | { kind: "ok"; text: string }
+  | { kind: "fallback"; text: string };
+
 function fallbackCommentForSlice(slice: CommentSlice): StoredAiComment {
   return {
     ply: slice.ply,
@@ -233,6 +249,8 @@ export class GameReviewPanel {
   private moveListFilter: MoveListFilter = null;
   private enginePreviewIndex: number | null = null;
   private storedAiComment: StoredAiComment | null = null;
+  private gameSummaryState: GameSummaryState | null = null;
+  private summaryRequestId = 0;
   private onAnalyze: (() => void) | null = null;
   private onReanalyze: (() => void) | null = null;
   private onCancel: (() => void) | null = null;
@@ -292,6 +310,8 @@ export class GameReviewPanel {
     this.currentPly = -1;
     this.enginePreviewIndex = null;
     this.storedAiComment = null;
+    this.gameSummaryState = null;
+    this.summaryRequestId += 1;
     this.moveListFilter = null;
     if (!game) {
       this.el.reviewSection.hidden = true;
@@ -304,6 +324,7 @@ export class GameReviewPanel {
     this.el.reanalyzeButton.hidden = true;
     this.el.progressBlock.hidden = true;
     this.el.resultsBlock.hidden = true;
+    this.el.gameSummary.hidden = true;
     this.el.moveList.replaceChildren();
     this.el.boardHost.replaceChildren();
   }
@@ -314,6 +335,9 @@ export class GameReviewPanel {
     this.el.reanalyzeButton.hidden = true;
     this.el.progressBlock.hidden = false;
     this.el.resultsBlock.hidden = true;
+    this.el.gameSummary.hidden = true;
+    this.gameSummaryState = null;
+    this.summaryRequestId += 1;
     this.el.progressBar.max = total;
     this.el.progressBar.value = done;
     this.el.progressLabel.textContent = formatAnalysisProgressLabel(
@@ -329,6 +353,8 @@ export class GameReviewPanel {
     this.currentPly = -1;
     this.enginePreviewIndex = null;
     this.storedAiComment = null;
+    this.gameSummaryState = null;
+    this.summaryRequestId += 1;
     this.moveListFilter = null;
     this.judgementCycleIndex.clear();
     this.classPlies = buildClassPlies(review.moves);
@@ -343,6 +369,7 @@ export class GameReviewPanel {
     this.updateMoveListFilterToolbar();
     this.updateDashboardPressedState();
     this.refreshView();
+    void this.loadGameSummary(review, game);
   }
 
   showAnalyzeReady(options?: { hideResults?: boolean }): void {
@@ -370,6 +397,108 @@ export class GameReviewPanel {
       `Precisão: Brancas ${this.review.white.accuracy.toFixed(1)}% · ` +
       `Pretas ${this.review.black.accuracy.toFixed(1)}%`;
     this.renderClassDashboard(countJudgements(this.review.moves));
+  }
+
+  private renderGameSummary(): void {
+    const el = this.el.gameSummary;
+    const state = this.gameSummaryState;
+
+    if (!state) {
+      el.hidden = true;
+      el.textContent = "";
+      el.className = "review-game-summary";
+      return;
+    }
+
+    el.hidden = false;
+    el.className = "review-game-summary";
+
+    if (state.kind === "loading") {
+      el.classList.add("review-game-summary-loading");
+      el.textContent = "Resumindo…";
+      return;
+    }
+
+    if (state.kind === "fallback") {
+      el.classList.add("review-game-summary-fallback");
+      el.textContent = `${FALLBACK_COMMENT_LABEL}\n${state.text}`;
+      return;
+    }
+
+    el.textContent = state.text;
+  }
+
+  private async loadGameSummary(
+    review: GameReview,
+    game: NormalizedGame,
+  ): Promise<void> {
+    const requestId = ++this.summaryRequestId;
+    const cacheKey = summaryCacheKey(review.gameId, review.algoVersion);
+    const slice = buildGameSummarySlice(review, game);
+    const cacheDeps = { indexedDB };
+
+    const isStale = (): boolean =>
+      requestId !== this.summaryRequestId ||
+      this.review?.gameId !== review.gameId ||
+      this.review?.algoVersion !== review.algoVersion;
+
+    this.gameSummaryState = { kind: "loading" };
+    this.renderGameSummary();
+
+    try {
+      const cached = await getCachedSummary(cacheKey, cacheDeps);
+      if (isStale()) {
+        return;
+      }
+      if (cached) {
+        this.gameSummaryState =
+          cached.source === "fallback"
+            ? { kind: "fallback", text: cached.text }
+            : { kind: "ok", text: cached.text };
+        this.renderGameSummary();
+        return;
+      }
+
+      const finish = async (
+        text: string,
+        source: SummaryCacheSource,
+        kind: "ok" | "fallback",
+      ): Promise<void> => {
+        await putCachedSummary(cacheKey, text, source, cacheDeps);
+        if (isStale()) {
+          return;
+        }
+        this.gameSummaryState = { kind, text };
+        this.renderGameSummary();
+      };
+
+      if (!isCommentProxyConfigured()) {
+        if (isStale()) {
+          return;
+        }
+        this.gameSummaryState = {
+          kind: "fallback",
+          text: buildFallbackGameSummary(slice),
+        };
+        this.renderGameSummary();
+        return;
+      }
+
+      try {
+        const summary = await requestGameSummary(slice);
+        await finish(summary, "llm", "ok");
+      } catch {
+        await finish(buildFallbackGameSummary(slice), "fallback", "fallback");
+      }
+    } catch {
+      if (!isStale()) {
+        this.gameSummaryState = {
+          kind: "fallback",
+          text: buildFallbackGameSummary(slice),
+        };
+        this.renderGameSummary();
+      }
+    }
   }
 
   private renderClassDashboard(judgements: JudgementsByColor): void {
