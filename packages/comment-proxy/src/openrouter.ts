@@ -21,6 +21,13 @@ export interface OpenRouterFailure {
 
 const MIN_COMMENT_LENGTH = 12;
 
+/** UCI coordinate move (e2e4, g7g8q) — must not appear in coach comments. */
+const UCI_MOVE_PATTERN = /\b[a-h][1-8][a-h][1-8][qrbn]?\b/i;
+
+/** Full FEN position string — must not appear in coach comments. */
+const FEN_PATTERN =
+  /\b(?:[rnbqkpRNBQKP1-8]+\/){7}[rnbqkpRNBQKP1-8]+\s+[wb]\s+[-KQkq]+\s+[-a-hA-H0-9]+\s+\d+\s+\d+\b/;
+
 function normalizeSan(san: string): string {
   return san.trim().replace(/[+#!?]+$/, "");
 }
@@ -31,6 +38,10 @@ function isTruncatedComment(content: string, san: string): boolean {
     return true;
   }
   return normalizeSan(trimmed) === normalizeSan(san);
+}
+
+function leaksEngineNotation(content: string): boolean {
+  return UCI_MOVE_PATTERN.test(content) || FEN_PATTERN.test(content);
 }
 
 export async function requestOpenRouterComment(
@@ -93,6 +104,14 @@ export async function requestOpenRouterComment(
     }
 
     if (isTruncatedComment(content, slice.san)) {
+      return {
+        ok: false,
+        status: 502,
+        message: "Falha ao gerar comentário.",
+      };
+    }
+
+    if (leaksEngineNotation(content)) {
       return {
         ok: false,
         status: 502,

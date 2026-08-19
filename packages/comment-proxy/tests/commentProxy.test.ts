@@ -1,6 +1,11 @@
 import { ALGO_VERSION, type CommentSlice } from "@game-review/core";
 import { describe, expect, it, vi } from "vitest";
-import { buildPrompt, buildPromptText } from "../src/buildPrompt.ts";
+import {
+  buildPrompt,
+  buildPromptText,
+  isFailureClassification,
+  isPositiveClassification,
+} from "../src/buildPrompt.ts";
 import { LEAKY_SLICE_KEYS, parseCommentSlice } from "../src/parseCommentSlice.ts";
 import { requestOpenRouterComment } from "../src/openrouter.ts";
 
@@ -126,6 +131,58 @@ describe("buildPrompt", () => {
     expect(user).toMatch(/recaptura|material igual/);
     expect(system).toContain("Não diga ganho de material se o cartão disser igual");
   });
+
+  const HONESTY_RULE =
+    "Nunca descreva o lance jogado como boa ideia, sacrifício interessante ou plano positivo";
+
+  it.each(["blunder", "mistake", "miss"] as const)(
+    "failure classification %s uses honesty block in system prompt",
+    (classification) => {
+      const slice: CommentSlice = { ...VALID_SLICE, classification };
+      const { system, user } = buildPrompt(slice);
+
+      expect(isFailureClassification(classification)).toBe(true);
+      expect(system).toContain("Primeiro o ERRO");
+      expect(system).toContain(HONESTY_RULE);
+      expect(user).toContain("MOTIVO");
+      expect(user).toContain("Cartão de fatos");
+      expect(user).toContain("por que o lance jogado é ruim");
+      expect(user).toContain("por que o melhor lance é melhor");
+    },
+  );
+
+  it.each(["best", "great", "brilliant"] as const)(
+    "positive classification %s omits failure honesty block",
+    (classification) => {
+      const slice: CommentSlice = {
+        ...VALID_SLICE,
+        classification,
+        playedIsBest: true,
+      };
+      const { system, user } = buildPrompt(slice);
+
+      expect(isPositiveClassification(classification)).toBe(true);
+      expect(system).not.toContain("Primeiro o ERRO");
+      expect(system).not.toContain(HONESTY_RULE);
+      expect(system).toContain("por que o lance jogado é forte");
+      expect(user).not.toContain("por que o lance jogado é ruim");
+      expect(user).toContain("Cartão de fatos");
+    },
+  );
+
+  it.each(["inaccuracy", "opening", "forced"] as const)(
+    "neutral classification %s uses shared base without failure or praise blocks",
+    (classification) => {
+      const slice: CommentSlice = { ...VALID_SLICE, classification };
+      const { system, user } = buildPrompt(slice);
+
+      expect(system).not.toContain("Primeiro o ERRO");
+      expect(system).not.toContain(HONESTY_RULE);
+      expect(system).not.toContain("por que o lance jogado é forte");
+      expect(user).not.toContain("por que o lance jogado é ruim");
+      expect(user).toContain("Cartão de fatos");
+    },
+  );
 });
 
 describe("requestOpenRouterComment", () => {
@@ -168,6 +225,61 @@ describe("requestOpenRouterComment", () => {
     expect(payload.reasoning).toEqual({ effort: "low", exclude: true });
     expect(payload.messages[1].content).toContain("Cartão de fatos");
     expect(JSON.stringify(payload)).not.toContain("uci");
+  });
+
+  it("returns 502 when model leaks UCI notation", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: "O cavalo deveria ir para e2e4 em vez de perder o peão no centro.",
+            },
+          },
+        ],
+      }),
+    }));
+
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      status: 502,
+      message: "Falha ao gerar comentário.",
+    });
+  });
+
+  it("returns 502 when model leaks a FEN string", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content:
+                "Depois do lance o tabuleiro fica 8/8/8/8/8/8/8/8 w - - 0 1 e as brancas perdem o centro.",
+            },
+          },
+        ],
+      }),
+    }));
+
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      status: 502,
+      message: "Falha ao gerar comentário.",
+    });
   });
 
   it("returns 502 when model returns only the played SAN", async () => {
