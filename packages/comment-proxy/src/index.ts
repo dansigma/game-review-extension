@@ -1,5 +1,7 @@
 import { parseCommentSlice } from "./parseCommentSlice.ts";
+import { parseGameSummarySlice } from "./parseGameSummarySlice.ts";
 import { requestOpenRouterComment, type OpenRouterEnv } from "./openrouter.ts";
+import { requestOpenRouterSummary } from "./summaryOpenrouter.ts";
 
 export interface Env extends OpenRouterEnv {}
 
@@ -70,6 +72,29 @@ async function handleComment(request: Request, env: Env): Promise<Response> {
   return jsonResponse(200, { comment: result.comment }, origin);
 }
 
+async function handleSummary(request: Request, env: Env): Promise<Response> {
+  const origin = request.headers.get("Origin");
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse(400, { error: "JSON inválido." }, origin);
+  }
+
+  const parsed = parseGameSummarySlice(body);
+  if (!parsed.ok) {
+    return jsonResponse(400, { error: parsed.error }, origin);
+  }
+
+  const result = await requestOpenRouterSummary(parsed.slice, env);
+  if (!result.ok) {
+    return jsonResponse(result.status, { error: result.message }, origin);
+  }
+
+  return jsonResponse(200, { summary: result.comment }, origin);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get("Origin");
@@ -91,6 +116,10 @@ export default {
 
     if (url.pathname === "/" || url.pathname === "/comment") {
       return handleComment(request, env);
+    }
+
+    if (url.pathname === "/summary") {
+      return handleSummary(request, env);
     }
 
     return jsonResponse(404, { error: "Não encontrado." }, origin);

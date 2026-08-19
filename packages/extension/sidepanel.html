@@ -165,6 +165,25 @@
       .review-summary p {
         margin: 0;
       }
+      .review-game-summary {
+        margin-top: 8px;
+        font-size: 13px;
+        line-height: 1.45;
+        padding: 8px 10px;
+        border: 1px solid #333;
+        border-radius: 6px;
+        background: #1a1917;
+      }
+      .review-game-summary.review-game-summary-loading {
+        color: var(--muted);
+        font-style: italic;
+      }
+      .review-game-summary.review-game-summary-fallback {
+        color: var(--muted);
+        white-space: pre-line;
+        border-color: #2a2926;
+        background: #161514;
+      }
       .review-summary .accuracy {
         color: var(--accent);
         font-weight: 600;
@@ -670,6 +689,7 @@
           <div class="review-summary">
             <p id="review-summary-result"></p>
             <p id="review-summary-accuracy" class="accuracy"></p>
+            <div id="review-game-summary" class="review-game-summary" hidden></div>
             <div id="review-summary-judgements" class="judgements class-dashboard"></div>
           </div>
           <div id="board-host" aria-label="Tabuleiro"></div>
