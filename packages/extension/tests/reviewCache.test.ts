@@ -72,6 +72,7 @@ describe("reviewCache", () => {
         algoVersion: ALGO_VERSION,
         engineId: MVP_ENGINE_ID,
         nodesPerPosition: MVP_NODES_PER_POSITION,
+        pass2Nodes: 1_500_000,
       },
       deps,
     );
@@ -128,6 +129,90 @@ describe("reviewCache", () => {
     );
 
     expect(cached).toBeNull();
+  });
+
+  it("misses when two-pass suffix differs", async () => {
+    const review = sampleReview({ nodesPerPosition: 80_000 });
+    await putCachedReview(review, deps);
+
+    const cached = await getCachedReview(
+      {
+        gameId: review.gameId,
+        algoVersion: ALGO_VERSION,
+        engineId: MVP_ENGINE_ID,
+        nodesPerPosition: 80_000,
+        pass2Nodes: 400_000,
+      },
+      deps,
+    );
+
+    expect(cached).not.toBeNull();
+
+    const wrongSuffix = await getCachedReview(
+      {
+        gameId: review.gameId,
+        algoVersion: ALGO_VERSION,
+        engineId: MVP_ENGINE_ID,
+        nodesPerPosition: 80_000,
+        pass2Nodes: 1_500_000,
+      },
+      deps,
+    );
+
+    expect(wrongSuffix).toBeNull();
+  });
+
+  it("stores Fast reviews under two-pass cache key", async () => {
+    const review = sampleReview({ nodesPerPosition: 80_000 });
+    await putCachedReview(review, deps);
+
+    const legacyMiss = await getCachedReview(
+      {
+        gameId: review.gameId,
+        algoVersion: ALGO_VERSION,
+        engineId: MVP_ENGINE_ID,
+        nodesPerPosition: 80_000,
+      },
+      deps,
+    );
+    expect(legacyMiss).toBeNull();
+
+    const hit = await getCachedReview(
+      {
+        gameId: review.gameId,
+        algoVersion: ALGO_VERSION,
+        engineId: MVP_ENGINE_ID,
+        nodesPerPosition: 80_000,
+        pass2Nodes: 400_000,
+      },
+      deps,
+    );
+    expect(hit).toEqual(review);
+  });
+
+  it("keeps Deep uniform cache key without tp2 suffix", async () => {
+    const review = sampleReview({ nodesPerPosition: 1_500_000 });
+    await putCachedReview(review, deps);
+
+    const cached = await getCachedReview(
+      {
+        gameId: review.gameId,
+        algoVersion: ALGO_VERSION,
+        engineId: MVP_ENGINE_ID,
+        nodesPerPosition: 1_500_000,
+      },
+      deps,
+    );
+
+    expect(cached).toEqual(review);
+    expect(
+      reviewCacheKey({
+        gameId: review.gameId,
+        algoVersion: ALGO_VERSION,
+        engineId: MVP_ENGINE_ID,
+        nodesPerPosition: 1_500_000,
+      }),
+    ).not.toContain("tp2:");
   });
 
   it("misses when gameId differs", async () => {

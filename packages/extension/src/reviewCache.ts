@@ -1,4 +1,5 @@
 import { type GameReview } from "@game-review/core";
+import { pass2NodesFor } from "./pass2Nodes.ts";
 
 export const REVIEW_CACHE_DB_NAME = "game-review-cache";
 export const REVIEW_CACHE_DB_VERSION = 1;
@@ -9,6 +10,8 @@ export interface ReviewCacheKeyParams {
   algoVersion: string;
   engineId: string;
   nodesPerPosition: number;
+  /** Pass-2 node budget when two-pass cache key is used (Fast/Standard pass 1). */
+  pass2Nodes?: number;
 }
 
 export interface ReviewCacheRecord {
@@ -21,15 +24,22 @@ export interface ReviewCacheDeps {
 }
 
 export function reviewCacheKey(params: ReviewCacheKeyParams): string {
-  return `${params.gameId}|${params.algoVersion}|${params.engineId}|${params.nodesPerPosition}`;
+  const base = `${params.gameId}|${params.algoVersion}|${params.engineId}|${params.nodesPerPosition}`;
+  if (params.pass2Nodes != null) {
+    return `${base}|tp2:${params.pass2Nodes}`;
+  }
+  return base;
 }
 
 function cacheParamsFromReview(review: GameReview): ReviewCacheKeyParams {
+  const nodesPerPosition = review.nodesPerPosition ?? 0;
+  const pass2Nodes = pass2NodesFor(nodesPerPosition);
   return {
     gameId: review.gameId,
     algoVersion: review.algoVersion,
     engineId: review.engineId,
-    nodesPerPosition: review.nodesPerPosition ?? 0,
+    nodesPerPosition,
+    ...(pass2Nodes !== null ? { pass2Nodes } : {}),
   };
 }
 
@@ -37,11 +47,13 @@ function isValidCacheHit(
   review: GameReview,
   params: ReviewCacheKeyParams,
 ): boolean {
+  const reviewParams = cacheParamsFromReview(review);
   return (
     review.gameId === params.gameId &&
     review.algoVersion === params.algoVersion &&
     review.engineId === params.engineId &&
-    review.nodesPerPosition === params.nodesPerPosition
+    review.nodesPerPosition === params.nodesPerPosition &&
+    reviewParams.pass2Nodes === params.pass2Nodes
   );
 }
 
