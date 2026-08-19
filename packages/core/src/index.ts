@@ -54,6 +54,13 @@ export {
 export { buildFallbackComment } from "./fallbackComment.ts";
 export { buildFallbackGameSummary } from "./fallbackGameSummary.ts";
 export {
+  finalStandingFromWinPercent,
+  gameEndReasonFromTermination,
+  isFinalStanding,
+  isGameEndReason,
+} from "./gameEndReason.ts";
+export type { FinalStanding, GameEndReason } from "./gameEndReason.ts";
+export {
   buildGameSummarySlice,
 } from "./gameSummarySlice.ts";
 export type {

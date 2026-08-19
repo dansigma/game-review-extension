@@ -1,5 +1,7 @@
 import {
   MOVE_CLASS_LABEL_PT,
+  type FinalStanding,
+  type GameEndReason,
   type GameSummaryMoment,
   type GameSummarySlice,
   type JudgementCounts,
@@ -13,7 +15,10 @@ const SUMMARY_SYSTEM =
   "Conte o que aconteceu de forma simples: resultado, quem jogou melhor ou pior, e os momentos mais importantes. " +
   "Não use markdown nem UCI. Não cite casas do tabuleiro em notação de coordenadas. " +
   "Nunca copie porcentagens de chance de vitória, EPL ou avaliações numéricas na resposta — " +
-  "use só o tamanho relativo dos erros para decidir o tom.";
+  "use só o tamanho relativo dos erros para decidir o tom. " +
+  "Se a partida acabou no tempo, a primeira frase deve dizer que o relógio decidiu o resultado. " +
+  "Não descreva um empate ou vitória no tempo como se ninguém tivesse convertido a vantagem. " +
+  "Se a posição final estava claramente desequilibrada, diga isso em linguagem simples, sem números de avaliação.";
 
 function colorLabel(color: PlayerColor): string {
   return color === "white" ? "Brancas" : "Pretas";
@@ -29,6 +34,38 @@ function formatResult(result: GameSummarySlice["result"]): string {
       return "Empate";
     default:
       return result;
+  }
+}
+
+function formatEndReason(endReason: GameEndReason): string {
+  switch (endReason) {
+    case "time":
+      return "no tempo (relógio decidiu)";
+    case "mate":
+      return "xeque-mate";
+    case "resign":
+      return "desistência";
+    case "stalemate":
+      return "afogamento";
+    case "agreement":
+      return "acordo entre os jogadores";
+    case "insufficient":
+      return "material insuficiente";
+    case "repetition":
+      return "repetição de lances";
+    case "unknown":
+      return "motivo não informado";
+  }
+}
+
+function formatFinalStanding(finalStanding: FinalStanding): string {
+  switch (finalStanding) {
+    case "white_winning":
+      return "brancas claramente à frente";
+    case "black_winning":
+      return "pretas claramente à frente";
+    case "equal":
+      return "equilibrada";
   }
 }
 
@@ -63,6 +100,8 @@ export function buildSummaryPrompt(slice: GameSummarySlice): {
 } {
   const lines: string[] = [
     `Resultado: ${formatResult(slice.result)}`,
+    `Como a partida acabou: ${formatEndReason(slice.endReason)}`,
+    `Posição final no tabuleiro (só para você): ${formatFinalStanding(slice.finalStanding)}`,
     `Precisão (só para você): brancas ${slice.whiteAccuracy.toFixed(1)}%, pretas ${slice.blackAccuracy.toFixed(1)}%`,
     formatJudgementLine("white", slice.judgements.white),
     formatJudgementLine("black", slice.judgements.black),
@@ -74,6 +113,18 @@ export function buildSummaryPrompt(slice: GameSummarySlice): {
     lines.push("Momentos críticos (ordem de importância):");
     for (const moment of slice.moments) {
       lines.push(`- ${formatMoment(moment)}`);
+    }
+  }
+
+  if (slice.endReason === "time") {
+    lines.push(
+      "Instrução: a partida terminou no tempo. Comece o resumo dizendo que o relógio decidiu. " +
+        "Não diga que ninguém converteu a vantagem se o empate ou a vitória foi por tempo.",
+    );
+    if (slice.finalStanding !== "equal") {
+      lines.push(
+        "Instrução: a posição final estava claramente desequilibrada — mencione isso em linguagem simples, sem números de avaliação.",
+      );
     }
   }
 

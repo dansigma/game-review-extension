@@ -25,6 +25,8 @@ const VALID_SLICE: GameSummarySlice = {
   gameId: "game-1",
   algoVersion: ALGO_VERSION,
   result: "1-0",
+  endReason: "mate",
+  finalStanding: "white_winning",
   whiteAccuracy: 91.2,
   blackAccuracy: 84.5,
   judgements: {
@@ -77,6 +79,24 @@ describe("parseGameSummarySlice", () => {
     const result = parseGameSummarySlice({ ...VALID_SLICE, algoVersion: "old" });
     expect(result.ok).toBe(false);
   });
+
+  it("accepts slice without endReason and finalStanding (defaults)", () => {
+    const { endReason: _e, finalStanding: _f, ...legacySlice } = VALID_SLICE;
+    const result = parseGameSummarySlice(legacySlice);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.slice.endReason).toBe("unknown");
+      expect(result.slice.finalStanding).toBe("equal");
+    }
+  });
+
+  it("rejects unknown termination key", () => {
+    const result = parseGameSummarySlice({ ...VALID_SLICE, termination: "Time forfeit" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("termination");
+    }
+  });
 });
 
 describe("buildSummaryPrompt", () => {
@@ -91,6 +111,22 @@ describe("buildSummaryPrompt", () => {
     expect(user).toContain("Qh4??");
     expect(user).toContain("só para você");
     expect(user).not.toMatch(/\be2e4\b/);
+  });
+
+  it("includes tempo language for timeout draw with white ahead", () => {
+    const slice: GameSummarySlice = {
+      ...VALID_SLICE,
+      result: "1/2-1/2",
+      endReason: "time",
+      finalStanding: "white_winning",
+    };
+    const { system, user } = buildSummaryPrompt(slice);
+
+    expect(user).toMatch(/tempo|relógio/i);
+    expect(user).toContain("brancas claramente à frente");
+    expect(user).toContain("só para você");
+    expect(system).toContain("relógio decidiu");
+    expect(system).toContain("Nunca copie");
   });
 });
 

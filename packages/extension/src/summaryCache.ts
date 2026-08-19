@@ -1,6 +1,7 @@
 export const SUMMARY_CACHE_DB_NAME = "game-summary-cache";
 export const SUMMARY_CACHE_DB_VERSION = 1;
 export const SUMMARY_CACHE_STORE = "summaries";
+export const SUMMARY_CACHE_VERSION = 2;
 
 export type SummaryCacheSource = "llm" | "fallback";
 
@@ -15,7 +16,7 @@ export interface SummaryCacheDeps {
 }
 
 export function summaryCacheKey(gameId: string, algoVersion: string): string {
-  return `${gameId}|${algoVersion}`;
+  return `${gameId}|${algoVersion}|${SUMMARY_CACHE_VERSION}`;
 }
 
 function openSummaryCacheDb(indexedDB: IDBFactory): Promise<IDBDatabase> {
