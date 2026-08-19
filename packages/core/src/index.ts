@@ -76,6 +76,7 @@ export {
   CRITICAL_EPL_MIN,
   DASHBOARD_CLASSES,
   countJudgements,
+  criticalMomentCap,
   selectCriticalMoments,
 } from "./criticalMoments.ts";
 export type {

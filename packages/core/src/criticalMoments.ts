@@ -97,10 +97,27 @@ export function countJudgements(
   return counts;
 }
 
+/** Max critical moments to show: at least 3, ~25% of reviewed plies. */
+export function criticalMomentCap(nPlies: number): number {
+  return Math.max(3, Math.ceil(nPlies * 0.25));
+}
+
+function compareCriticalMoments(a: CriticalMoment, b: CriticalMoment): number {
+  if (b.winPercentSwing !== a.winPercentSwing) {
+    return b.winPercentSwing - a.winPercentSwing;
+  }
+  if (b.epl !== a.epl) {
+    return b.epl - a.epl;
+  }
+  return a.ply - b.ply;
+}
+
 export function selectCriticalMoments(
   moves: readonly ReviewedMove[],
 ): CriticalMoment[] {
-  return moves
+  const cap = criticalMomentCap(moves.length);
+
+  const ranked = moves
     .filter((move) => isCriticalClassification(move.classification))
     .map((move) => {
       const evalAfter = formatMoveEvalAfter(move);
@@ -116,5 +133,11 @@ export function selectCriticalMoments(
         evalBefore: evalBefore !== evalAfter ? evalBefore : undefined,
       };
     })
-    .sort((a, b) => a.ply - b.ply);
+    .sort(compareCriticalMoments);
+
+  if (ranked.length === 0) {
+    return [];
+  }
+
+  return ranked.slice(0, Math.min(cap, ranked.length));
 }
