@@ -5,8 +5,10 @@ import { ALGO_VERSION, type CommentSlice, type GameReview, type ReviewedMove } f
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CommentProxyError,
+  COMMENT_PROXY_TIMEOUT_MS,
   getCommentProxyBaseUrl,
   isCommentProxyConfigured,
+  isCommentUsable,
   proxyUrlFromEnv,
   requestComment,
 } from "../src/commentProxy.ts";
@@ -178,5 +180,57 @@ describe("requestComment", () => {
     );
 
     await expect(requestComment(SAMPLE_SLICE)).rejects.toThrow("Campo proibido: uci.");
+  });
+
+  it("throws on whitespace-only comment body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ comment: "   " }),
+      })),
+    );
+
+    await expect(requestComment(SAMPLE_SLICE)).rejects.toThrow("Resposta vazia do proxy.");
+  });
+
+  it("throws on truncated unusable comment body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ comment: "ok" }),
+      })),
+    );
+
+    await expect(requestComment(SAMPLE_SLICE)).rejects.toThrow("Resposta vazia do proxy.");
+  });
+
+  it("passes AbortSignal with configured timeout", async () => {
+    const fetchMock = vi.fn<
+      (input: string, init?: RequestInit) => Promise<{ ok: boolean; json: () => Promise<{ comment: string }> }>
+    >(async () => ({
+      ok: true,
+      json: async () => ({ comment: "Comentário completo do lance." }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestComment(SAMPLE_SLICE);
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+    expect(COMMENT_PROXY_TIMEOUT_MS).toBe(20_000);
+  });
+});
+
+describe("isCommentUsable", () => {
+  it("rejects empty and very short strings", () => {
+    expect(isCommentUsable("")).toBe(false);
+    expect(isCommentUsable("   ")).toBe(false);
+    expect(isCommentUsable("curto")).toBe(false);
+  });
+
+  it("accepts a normal comment length", () => {
+    expect(isCommentUsable("Lance sólido no centro.")).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import {
   buildCommentSlice,
+  buildFallbackComment,
   classificationGlyph,
   countJudgements,
   DASHBOARD_CLASSES,
@@ -28,8 +29,8 @@ import {
 } from "../budgetDecision.ts";
 import { formatAnalysisProgressLabel } from "../analysisEta.ts";
 import {
-  CommentProxyError,
   isCommentProxyConfigured,
+  isCommentUsable,
   requestComment,
 } from "../commentProxy.ts";
 import { fenAtPly, renderChessBoard, uciSquares } from "./chessBoard.ts";
@@ -194,8 +195,18 @@ const PRESET_IDS: EngineQualityPresetId[] = ["fast", "standard", "deep"];
 type StoredAiComment = {
   ply: number;
   text: string;
-  kind: "loading" | "ok" | "error";
+  kind: "loading" | "ok" | "error" | "fallback";
 };
+
+const FALLBACK_COMMENT_LABEL = "Texto automático (sem IA)";
+
+function fallbackCommentForSlice(slice: CommentSlice): StoredAiComment {
+  return {
+    ply: slice.ply,
+    text: buildFallbackComment(slice),
+    kind: "fallback",
+  };
+}
 
 function fillPresetSelect(select: HTMLSelectElement): void {
   const selected = isEngineQualityPresetId(select.value)
@@ -790,13 +801,18 @@ export class GameReviewPanel {
     }
 
     commentSliceAi.hidden = false;
-    commentSliceAi.textContent = stored.text;
+    commentSliceAi.textContent =
+      stored.kind === "fallback"
+        ? `${FALLBACK_COMMENT_LABEL}\n${stored.text}`
+        : stored.text;
     commentSliceAi.className =
       stored.kind === "loading"
         ? "comment-slice-ai-loading"
         : stored.kind === "error"
           ? "comment-slice-ai-error"
-          : "";
+          : stored.kind === "fallback"
+            ? "comment-slice-ai-fallback"
+            : "";
   }
 
   private async onCommentClick(): Promise<void> {
@@ -824,23 +840,17 @@ export class GameReviewPanel {
     try {
       const comment = await requestComment(slice);
       if (this.currentPly === slice.ply) {
-        this.storedAiComment = {
-          ply: slice.ply,
-          text: comment,
-          kind: "ok",
-        };
+        this.storedAiComment = isCommentUsable(comment)
+          ? {
+              ply: slice.ply,
+              text: comment,
+              kind: "ok",
+            }
+          : fallbackCommentForSlice(slice);
       }
-    } catch (error) {
+    } catch {
       if (this.currentPly === slice.ply) {
-        const message =
-          error instanceof CommentProxyError
-            ? error.message
-            : "Não foi possível obter o comentário.";
-        this.storedAiComment = {
-          ply: slice.ply,
-          text: message,
-          kind: "error",
-        };
+        this.storedAiComment = fallbackCommentForSlice(slice);
       }
     } finally {
       this.refreshView();

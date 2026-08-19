@@ -51,6 +51,7 @@ export {
   describeReplyCaptures,
   formatCommentBoardFacts,
 } from "./commentBoardFacts.ts";
+export { buildFallbackComment } from "./fallbackComment.ts";
 export type { CommentBoardFacts, CommentBoardFactsInput } from "./commentBoardFacts.ts";
 export {
   applyOpeningFilter,
