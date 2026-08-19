@@ -1,6 +1,10 @@
 import {
   ALGO_VERSION,
   DASHBOARD_CLASSES,
+  isFinalStanding,
+  isGameEndReason,
+  type FinalStanding,
+  type GameEndReason,
   type GameResult,
   type GameSummaryMoment,
   type GameSummarySlice,
@@ -37,7 +41,11 @@ const REQUIRED_KEYS: readonly (keyof GameSummarySlice)[] = [
   "moments",
 ];
 
-const ALLOWED_KEYS = new Set<string>([...REQUIRED_KEYS]);
+const ALLOWED_KEYS = new Set<string>([
+  ...REQUIRED_KEYS,
+  "endReason",
+  "finalStanding",
+]);
 
 export type ParseGameSummarySliceResult =
   | { ok: true; slice: GameSummarySlice }
@@ -152,6 +160,8 @@ export function parseGameSummarySlice(body: unknown): ParseGameSummarySliceResul
     gameId,
     algoVersion,
     result,
+    endReason,
+    finalStanding,
     whiteAccuracy,
     blackAccuracy,
     judgements,
@@ -167,6 +177,23 @@ export function parseGameSummarySlice(body: unknown): ParseGameSummarySliceResul
   if (!isGameResult(result)) {
     return { ok: false, error: "result inválido." };
   }
+
+  let parsedEndReason: GameEndReason = "unknown";
+  if ("endReason" in body) {
+    if (!isString(endReason) || !isGameEndReason(endReason)) {
+      return { ok: false, error: "endReason inválido." };
+    }
+    parsedEndReason = endReason;
+  }
+
+  let parsedFinalStanding: FinalStanding = "equal";
+  if ("finalStanding" in body) {
+    if (!isString(finalStanding) || !isFinalStanding(finalStanding)) {
+      return { ok: false, error: "finalStanding inválido." };
+    }
+    parsedFinalStanding = finalStanding;
+  }
+
   if (!isNumber(whiteAccuracy) || whiteAccuracy < 0 || whiteAccuracy > 100) {
     return { ok: false, error: "whiteAccuracy inválido." };
   }
@@ -201,6 +228,8 @@ export function parseGameSummarySlice(body: unknown): ParseGameSummarySliceResul
       gameId,
       algoVersion,
       result,
+      endReason: parsedEndReason,
+      finalStanding: parsedFinalStanding,
       whiteAccuracy,
       blackAccuracy,
       judgements: parsedJudgements,

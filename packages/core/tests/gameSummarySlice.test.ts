@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildFallbackGameSummary } from "../src/fallbackGameSummary.ts";
+import { gameEndReasonFromTermination } from "../src/gameEndReason.ts";
 import { buildGameSummarySlice } from "../src/gameSummarySlice.ts";
 import { ALGO_VERSION } from "../src/types.ts";
 import type { GameReview, NormalizedGame, ReviewedMove } from "../src/types.ts";
@@ -93,6 +94,8 @@ describe("buildGameSummarySlice", () => {
     expect(slice.gameId).toBe("game-1");
     expect(slice.algoVersion).toBe(ALGO_VERSION);
     expect(slice.result).toBe("1-0");
+    expect(slice.endReason).toBe("unknown");
+    expect(slice.finalStanding).toBe("equal");
     expect(slice.whiteAccuracy).toBe(91.2);
     expect(slice.blackAccuracy).toBe(84.7);
     expect(slice.judgements.white.blunder).toBe(1);
@@ -114,6 +117,35 @@ describe("buildGameSummarySlice", () => {
       expect(moment).not.toHaveProperty("uci");
       expect(moment).not.toHaveProperty("fen");
       expect(moment).not.toHaveProperty("evalAfter");
+    }
+  });
+
+  it("includes endReason from termination and finalStanding from last move", () => {
+    const moves = [
+      fakeMove({
+        ply: 0,
+        color: "white",
+        epl: 0.01,
+        classification: "best",
+        whiteWinPercentAfter: 95,
+        playedIsBest: true,
+      }),
+    ];
+    const review = stubReview(moves);
+    const game = stubGame({
+      result: "1/2-1/2",
+      termination: "Time forfeit",
+    });
+    const slice = buildGameSummarySlice(review, game);
+
+    expect(slice.endReason).toBe("time");
+    expect(slice.finalStanding).toBe("white_winning");
+    expect(gameEndReasonFromTermination(game.termination)).toBe("time");
+
+    const payload = JSON.stringify(slice);
+    expect(payload).not.toContain("termination");
+    for (const key of LEAK_KEYS) {
+      expect(payload).not.toContain(`"${key}"`);
     }
   });
 });
@@ -155,5 +187,28 @@ describe("buildFallbackGameSummary", () => {
     expect(text).toContain("poucos erros graves");
     expect(text).not.toMatch(UCI_PATTERN);
     expect(text).not.toMatch(EVAL_PATTERN);
+  });
+
+  it("mentions tempo and brancas à frente on timeout draw with white ahead", () => {
+    const review = stubReview([
+      fakeMove({
+        ply: 0,
+        color: "white",
+        epl: 0.01,
+        classification: "best",
+        whiteWinPercentAfter: 95,
+        playedIsBest: true,
+      }),
+    ]);
+    const slice = buildGameSummarySlice(
+      review,
+      stubGame({ result: "1/2-1/2", termination: "Time forfeit" }),
+    );
+    const text = buildFallbackGameSummary(slice);
+
+    expect(text.toLowerCase()).toMatch(/tempo/);
+    expect(text.toLowerCase()).toMatch(/brancas.*à frente/);
+    expect(text).not.toMatch(EVAL_PATTERN);
+    expect(text).not.toMatch(/\+10/);
   });
 });

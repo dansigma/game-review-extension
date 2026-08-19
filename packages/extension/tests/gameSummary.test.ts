@@ -6,7 +6,7 @@ import {
   requestGameSummary,
   summaryEndpoint,
 } from "../src/commentProxy.ts";
-import { summaryCacheKey } from "../src/summaryCache.ts";
+import { summaryCacheKey, SUMMARY_CACHE_VERSION } from "../src/summaryCache.ts";
 import { buildGameSummarySlice, buildFallbackGameSummary } from "@game-review/core";
 import type { GameReview, NormalizedGame, ReviewedMove } from "@game-review/core";
 
@@ -14,6 +14,8 @@ const SAMPLE_SUMMARY_SLICE = {
   gameId: "game-1",
   algoVersion: ALGO_VERSION,
   result: "1-0" as const,
+  endReason: "mate" as const,
+  finalStanding: "white_winning" as const,
   whiteAccuracy: 90,
   blackAccuracy: 85,
   judgements: {
@@ -114,8 +116,10 @@ describe("summaryEndpoint", () => {
 });
 
 describe("summaryCacheKey", () => {
-  it("uses only gameId and algoVersion", () => {
-    expect(summaryCacheKey("abc", ALGO_VERSION)).toBe(`abc|${ALGO_VERSION}`);
+  it("includes gameId, algoVersion, and cache version", () => {
+    expect(summaryCacheKey("abc", ALGO_VERSION)).toBe(
+      `abc|${ALGO_VERSION}|${SUMMARY_CACHE_VERSION}`,
+    );
   });
 });
 

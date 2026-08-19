@@ -1,9 +1,33 @@
 import type { JudgementsByColor } from "./criticalMoments.ts";
+import type { FinalStanding, GameEndReason } from "./gameEndReason.ts";
 import type { GameSummarySlice } from "./gameSummarySlice.ts";
 import { MOVE_CLASS_LABEL_PT } from "./types.ts";
 import type { GameResult, PlayerColor } from "./types.ts";
 
-function formatResult(result: GameResult): string {
+function formatResult(
+  result: GameResult,
+  endReason: GameEndReason,
+  finalStanding: FinalStanding,
+): string {
+  if (endReason === "time") {
+    switch (result) {
+      case "1-0":
+        return "As brancas venceram no tempo.";
+      case "0-1":
+        return "As pretas venceram no tempo.";
+      case "1/2-1/2":
+        if (finalStanding === "white_winning") {
+          return "A partida empatou porque o tempo acabou, mesmo com as brancas claramente à frente no tabuleiro.";
+        }
+        if (finalStanding === "black_winning") {
+          return "A partida empatou porque o tempo acabou, mesmo com as pretas claramente à frente no tabuleiro.";
+        }
+        return "A partida empatou porque o tempo acabou.";
+      default:
+        return "A partida terminou por tempo.";
+    }
+  }
+
   switch (result) {
     case "1-0":
       return "As brancas venceram a partida.";
@@ -76,7 +100,7 @@ function formatMomentRef(ply: number, color: PlayerColor, san: string): string {
  */
 export function buildFallbackGameSummary(slice: GameSummarySlice): string {
   const sentences: string[] = [
-    formatResult(slice.result),
+    formatResult(slice.result, slice.endReason, slice.finalStanding),
     `Precisão: brancas ${slice.whiteAccuracy.toFixed(1)}%, pretas ${slice.blackAccuracy.toFixed(1)}%.`,
     judgementSummary(slice.judgements),
   ];
