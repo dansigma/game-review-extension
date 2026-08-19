@@ -2,6 +2,7 @@ import {
   MOVE_CLASS_LABEL_PT,
   buildCommentBoardFacts,
   formatCommentBoardFacts,
+  type CommentIntent,
   type CommentSlice,
   type MoveClass,
 } from "@game-review/core";
@@ -15,19 +16,35 @@ const SHARED_BASE =
   "Não adivinhe qual peça está numa casa a partir do SAN — o cartão já diz. " +
   "Não diga ganho de material se o cartão disser igual ou troca.";
 
+const HONESTY_RULE =
+  "Nunca descreva o lance jogado como boa ideia, sacrifício interessante ou plano positivo.";
+
 const FAILURE_BLOCK =
   "\n\nPrimeiro o ERRO: explique por que o lance jogado é ruim usando o Filme do MOTIVO e o tabuleiro — " +
   "ameaça, material e motivo. " +
-  "Nunca descreva o lance jogado como boa ideia, sacrifício interessante ou plano positivo. " +
+  HONESTY_RULE + " " +
   "Depois o LANCE MELHOR: use a Ideia do melhor lance quando existir. " +
+  "Não recite a linha inteira. Não invente ideia que o cartão não sustenta. Não use markdown nem UCI.";
+
+const WHAT_WAS_MISSED_BLOCK =
+  "\n\nExplique o que foi perdido neste lance usando o Filme do MOTIVO, o melhor lance e o cartão de fatos — " +
+  "ameaça, material e oportunidade que passou. " +
+  HONESTY_RULE + " " +
+  "Não elogie o lance jogado. Use a Ideia do melhor lance quando existir. " +
   "Não recite a linha inteira. Não invente ideia que o cartão não sustenta. Não use markdown nem UCI.";
 
 const POSITIVE_BLOCK =
   "\n\nExplique por que o lance jogado é forte, usando o cartão de fatos e a Ideia do melhor lance quando existir. " +
   "Não recite a linha inteira. Não invente ideia que o cartão não sustenta. Não use markdown nem UCI.";
 
+const NEUTRAL_TAIL =
+  "\n\nNão recite a linha inteira. Não invente ideia que o cartão não sustenta. Não use markdown nem UCI.";
+
 const FAILURE_CLOSER =
   "Escreva o comentário: 1) por que o lance jogado é ruim; 2) por que o melhor lance é melhor.";
+
+const WHAT_WAS_MISSED_CLOSER =
+  "Escreva o comentário: 1) o que foi perdido ou deixado de fazer; 2) por que o melhor lance é melhor.";
 
 const POSITIVE_CLOSER =
   "Escreva o comentário explicando por que o lance jogado é forte e o que ele conquista no tabuleiro.";
@@ -53,27 +70,51 @@ export function isPositiveClassification(
   return (POSITIVE_CLASSIFICATIONS as readonly string[]).includes(classification);
 }
 
-function buildSystemPrompt(classification: MoveClass): string {
-  if (isFailureClassification(classification)) {
-    return SHARED_BASE + FAILURE_BLOCK;
-  }
-  if (isPositiveClassification(classification)) {
-    return SHARED_BASE + POSITIVE_BLOCK;
-  }
-  return (
-    SHARED_BASE +
-    "\n\nNão recite a linha inteira. Não invente ideia que o cartão não sustenta. Não use markdown nem UCI."
-  );
+export function isFailureIntent(intent: CommentIntent): boolean {
+  return intent === "blunder_explanation" || intent === "what_was_missed";
 }
 
-function buildUserCloser(classification: MoveClass): string {
-  if (isFailureClassification(classification)) {
-    return FAILURE_CLOSER;
+function buildSystemPrompt(intent: CommentIntent): string {
+  switch (intent) {
+    case "blunder_explanation":
+      return SHARED_BASE + FAILURE_BLOCK;
+    case "what_was_missed":
+      return SHARED_BASE + WHAT_WAS_MISSED_BLOCK;
+    case "why_this_move":
+      return SHARED_BASE + POSITIVE_BLOCK;
+    case "neutral":
+      return SHARED_BASE + NEUTRAL_TAIL;
   }
-  if (isPositiveClassification(classification)) {
-    return POSITIVE_CLOSER;
+}
+
+function buildUserCloser(intent: CommentIntent): string {
+  switch (intent) {
+    case "blunder_explanation":
+      return FAILURE_CLOSER;
+    case "what_was_missed":
+      return WHAT_WAS_MISSED_CLOSER;
+    case "why_this_move":
+      return POSITIVE_CLOSER;
+    case "neutral":
+      return NEUTRAL_CLOSER;
   }
-  return NEUTRAL_CLOSER;
+}
+
+function intentTaskLabel(intent: CommentIntent): string {
+  switch (intent) {
+    case "blunder_explanation":
+      return "explicar o erro grave";
+    case "what_was_missed":
+      return "explicar o que foi perdido";
+    case "why_this_move":
+      return "explicar por que o lance é forte";
+    case "neutral":
+      return "comentar o lance de forma neutra";
+  }
+}
+
+function suggestedLengthLabel(length: CommentSlice["suggestedLength"]): string {
+  return length === "brief" ? "breve" : "padrão";
 }
 
 function colorLabel(color: CommentSlice["color"]): string {
@@ -105,6 +146,8 @@ export function buildPrompt(slice: CommentSlice): { system: string; user: string
   const lines: string[] = [
     `Lance jogado: ${playedMoveRef(slice)} (${colorLabel(slice.color)})`,
     `Julgamento: ${classificationLabel(slice.classification)}`,
+    `Tarefa: ${intentTaskLabel(slice.commentIntent)}`,
+    `Comprimento: ${suggestedLengthLabel(slice.suggestedLength)}`,
     `Foi o melhor lance? ${slice.playedIsBest ? "sim" : "não"}`,
     `Lance único que segurava? ${slice.onlyMove ? "sim" : "não"}`,
   ];
@@ -146,10 +189,10 @@ export function buildPrompt(slice: CommentSlice): { system: string; user: string
     );
   }
 
-  lines.push(buildUserCloser(slice.classification));
+  lines.push(buildUserCloser(slice.commentIntent));
 
   return {
-    system: buildSystemPrompt(slice.classification),
+    system: buildSystemPrompt(slice.commentIntent),
     user: lines.join("\n"),
   };
 }

@@ -35,8 +35,17 @@ export {
   weightedMean,
 } from "./accuracy.ts";
 export type { GameAccuracyResult } from "./accuracy.ts";
-export { buildCommentSlice, REPLY_LINE_SAN_MAX } from "./commentSlice.ts";
-export type { CommentSlice } from "./commentSlice.ts";
+export {
+  buildCommentSlice,
+  commentIntentForMove,
+  REPLY_LINE_SAN_MAX,
+  suggestedLengthForIntent,
+} from "./commentSlice.ts";
+export type {
+  CommentIntent,
+  CommentSlice,
+  SuggestedLength,
+} from "./commentSlice.ts";
 export {
   buildCommentBoardFacts,
   describeReplyCaptures,

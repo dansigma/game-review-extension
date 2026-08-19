@@ -1,8 +1,10 @@
 import {
   ALGO_VERSION,
+  type CommentIntent,
   type CommentSlice,
   type MoveClass,
   type PlayerColor,
+  type SuggestedLength,
 } from "@game-review/core";
 
 /** Keys that must never reach the Worker — reject with 400. */
@@ -30,6 +32,15 @@ const MOVE_CLASSES: readonly MoveClass[] = [
 
 const PLAYER_COLORS: readonly PlayerColor[] = ["white", "black"];
 
+const COMMENT_INTENTS: readonly CommentIntent[] = [
+  "blunder_explanation",
+  "what_was_missed",
+  "why_this_move",
+  "neutral",
+];
+
+const SUGGESTED_LENGTHS: readonly SuggestedLength[] = ["brief", "standard"];
+
 const REQUIRED_KEYS: readonly (keyof CommentSlice)[] = [
   "gameId",
   "algoVersion",
@@ -37,6 +48,9 @@ const REQUIRED_KEYS: readonly (keyof CommentSlice)[] = [
   "san",
   "color",
   "classification",
+  "commentIntent",
+  "winPercentDelta",
+  "suggestedLength",
   "epl",
   "accuracy",
   "playerWinPercentBefore",
@@ -88,6 +102,14 @@ function isAccuracy(value: unknown): value is number | null {
   return value === null || isNumber(value);
 }
 
+function isCommentIntent(value: unknown): value is CommentIntent {
+  return isString(value) && COMMENT_INTENTS.includes(value as CommentIntent);
+}
+
+function isSuggestedLength(value: unknown): value is SuggestedLength {
+  return isString(value) && SUGGESTED_LENGTHS.includes(value as SuggestedLength);
+}
+
 export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   if (!isRecord(body)) {
     return { ok: false, error: "Corpo JSON inválido." };
@@ -121,6 +143,9 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
     san,
     color,
     classification,
+    commentIntent,
+    winPercentDelta,
+    suggestedLength,
     epl,
     accuracy,
     playerWinPercentBefore,
@@ -152,6 +177,15 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   }
   if (!isMoveClass(classification)) {
     return { ok: false, error: "classification inválida." };
+  }
+  if (!isCommentIntent(commentIntent)) {
+    return { ok: false, error: "commentIntent inválido." };
+  }
+  if (!isNumber(winPercentDelta)) {
+    return { ok: false, error: "winPercentDelta inválido." };
+  }
+  if (!isSuggestedLength(suggestedLength)) {
+    return { ok: false, error: "suggestedLength inválido." };
   }
   if (!isNumber(epl) || epl < 0) {
     return { ok: false, error: "epl inválido." };
@@ -197,6 +231,9 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
     san,
     color,
     classification,
+    commentIntent,
+    winPercentDelta,
+    suggestedLength,
     epl,
     accuracy,
     playerWinPercentBefore,
