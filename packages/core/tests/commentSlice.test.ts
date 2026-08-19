@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildCommentSlice } from "../src/commentSlice.ts";
+import {
+  buildCommentSlice,
+  commentIntentForMove,
+  suggestedLengthForIntent,
+} from "../src/commentSlice.ts";
 import { ONLY_MOVE_WIN_PERCENT_GAP } from "../src/onlyMove.ts";
-import { ALGO_VERSION, type GameReview, type ReviewedMove } from "../src/types.ts";
+import { ALGO_VERSION, type GameReview, type MoveClass, type ReviewedMove } from "../src/types.ts";
 
 function fakeMove(
   overrides: Partial<ReviewedMove> & Pick<ReviewedMove, "ply" | "color">,
@@ -56,6 +60,41 @@ const ENGINE_LEAK_KEYS = [
   "pv",
 ] as const;
 
+const MOVE_CLASS_INTENT_CASES: ReadonlyArray<{
+  classification: MoveClass;
+  commentIntent: ReturnType<typeof commentIntentForMove>;
+}> = [
+  { classification: "blunder", commentIntent: "blunder_explanation" },
+  { classification: "mistake", commentIntent: "what_was_missed" },
+  { classification: "miss", commentIntent: "what_was_missed" },
+  { classification: "inaccuracy", commentIntent: "what_was_missed" },
+  { classification: "brilliant", commentIntent: "why_this_move" },
+  { classification: "great", commentIntent: "why_this_move" },
+  { classification: "best", commentIntent: "why_this_move" },
+  { classification: "opening", commentIntent: "neutral" },
+  { classification: "forced", commentIntent: "neutral" },
+];
+
+describe("commentIntentForMove", () => {
+  it.each(MOVE_CLASS_INTENT_CASES)(
+    "maps $classification to $commentIntent",
+    ({ classification, commentIntent }) => {
+      expect(commentIntentForMove(classification)).toBe(commentIntent);
+    },
+  );
+});
+
+describe("suggestedLengthForIntent", () => {
+  it.each([
+    { intent: "blunder_explanation" as const, length: "standard" as const },
+    { intent: "what_was_missed" as const, length: "standard" as const },
+    { intent: "why_this_move" as const, length: "brief" as const },
+    { intent: "neutral" as const, length: "brief" as const },
+  ])("maps $intent to $length", ({ intent, length }) => {
+    expect(suggestedLengthForIntent(intent)).toBe(length);
+  });
+});
+
 describe("buildCommentSlice", () => {
   it("returns the listed fields for a valid ply", () => {
     const review = stubReview([
@@ -83,6 +122,9 @@ describe("buildCommentSlice", () => {
       san: "e4",
       color: "white",
       classification: "best",
+      commentIntent: "why_this_move",
+      winPercentDelta: -1,
+      suggestedLength: "brief",
       epl: 0.03,
       accuracy: 92,
       playerWinPercentBefore: 50,
@@ -276,6 +318,9 @@ describe("buildCommentSlice", () => {
       san: "Kf1",
       color: "white",
       classification: "forced",
+      commentIntent: "neutral",
+      winPercentDelta: -1,
+      suggestedLength: "brief",
       epl: 0,
       accuracy: 85,
       playerWinPercentBefore: 5,

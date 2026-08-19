@@ -4,6 +4,7 @@ import {
   buildPrompt,
   buildPromptText,
   isFailureClassification,
+  isFailureIntent,
   isPositiveClassification,
 } from "../src/buildPrompt.ts";
 import { LEAKY_SLICE_KEYS, parseCommentSlice } from "../src/parseCommentSlice.ts";
@@ -16,6 +17,9 @@ const VALID_SLICE: CommentSlice = {
   san: "Bb5",
   color: "white",
   classification: "mistake",
+  commentIntent: "what_was_missed",
+  winPercentDelta: 48.1 - 52.3,
+  suggestedLength: "standard",
   epl: 0.12,
   accuracy: 78.5,
   playerWinPercentBefore: 52.3,
@@ -47,6 +51,9 @@ describe("parseCommentSlice", () => {
       san: "e4",
       color: "white",
       classification: "best",
+      commentIntent: "why_this_move",
+      winPercentDelta: -1,
+      suggestedLength: "brief",
       epl: 0,
       accuracy: 99,
       playerWinPercentBefore: 50,
@@ -79,6 +86,21 @@ describe("parseCommentSlice", () => {
     const result = parseCommentSlice({ ...VALID_SLICE, algoVersion: "old" });
     expect(result.ok).toBe(false);
   });
+
+  it("rejects invalid commentIntent", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, commentIntent: "praise_blunder" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects invalid suggestedLength", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, suggestedLength: "long" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects non-finite winPercentDelta", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, winPercentDelta: Number.NaN });
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("buildPrompt", () => {
@@ -94,6 +116,8 @@ describe("buildPrompt", () => {
     expect(user).toContain("Bb5");
     expect(user).toContain("Qxd4");
     expect(user).toContain("MOTIVO");
+    expect(user).toContain("Tarefa:");
+    expect(user).toContain("Comprimento:");
     expect(user).toContain("FEN de backup");
     expect(user).toContain("8/2q5/8/8/8/2Q5/8/8");
     expect(user).not.toMatch(/\be2e4\b/);
@@ -135,28 +159,49 @@ describe("buildPrompt", () => {
   const HONESTY_RULE =
     "Nunca descreva o lance jogado como boa ideia, sacrifício interessante ou plano positivo";
 
-  it.each(["blunder", "mistake", "miss"] as const)(
-    "failure classification %s uses honesty block in system prompt",
-    (classification) => {
-      const slice: CommentSlice = { ...VALID_SLICE, classification };
-      const { system, user } = buildPrompt(slice);
+  it("blunder_explanation intent uses honesty block and Primeiro o ERRO", () => {
+    const slice: CommentSlice = {
+      ...VALID_SLICE,
+      classification: "blunder",
+      commentIntent: "blunder_explanation",
+      suggestedLength: "standard",
+    };
+    const { system, user } = buildPrompt(slice);
 
-      expect(isFailureClassification(classification)).toBe(true);
-      expect(system).toContain("Primeiro o ERRO");
-      expect(system).toContain(HONESTY_RULE);
-      expect(user).toContain("MOTIVO");
-      expect(user).toContain("Cartão de fatos");
-      expect(user).toContain("por que o lance jogado é ruim");
-      expect(user).toContain("por que o melhor lance é melhor");
-    },
-  );
+    expect(isFailureIntent(slice.commentIntent)).toBe(true);
+    expect(system).toContain("Primeiro o ERRO");
+    expect(system).toContain(HONESTY_RULE);
+    expect(user).toContain("MOTIVO");
+    expect(user).toContain("Cartão de fatos");
+    expect(user).toContain("por que o lance jogado é ruim");
+    expect(user).toContain("por que o melhor lance é melhor");
+  });
+
+  it("what_was_missed intent uses missed-opportunity task without Primeiro o ERRO", () => {
+    const slice: CommentSlice = {
+      ...VALID_SLICE,
+      classification: "mistake",
+      commentIntent: "what_was_missed",
+      suggestedLength: "standard",
+    };
+    const { system, user } = buildPrompt(slice);
+
+    expect(isFailureIntent(slice.commentIntent)).toBe(true);
+    expect(system).not.toContain("Primeiro o ERRO");
+    expect(system).toContain(HONESTY_RULE);
+    expect(system).toContain("o que foi perdido");
+    expect(user).toContain("o que foi perdido ou deixado de fazer");
+    expect(user).toContain("por que o melhor lance é melhor");
+  });
 
   it.each(["best", "great", "brilliant"] as const)(
-    "positive classification %s omits failure honesty block",
+    "why_this_move intent for classification %s omits failure honesty block",
     (classification) => {
       const slice: CommentSlice = {
         ...VALID_SLICE,
         classification,
+        commentIntent: "why_this_move",
+        suggestedLength: "brief",
         playedIsBest: true,
       };
       const { system, user } = buildPrompt(slice);
@@ -167,13 +212,19 @@ describe("buildPrompt", () => {
       expect(system).toContain("por que o lance jogado é forte");
       expect(user).not.toContain("por que o lance jogado é ruim");
       expect(user).toContain("Cartão de fatos");
+      expect(user).toContain("Comprimento: breve");
     },
   );
 
-  it.each(["inaccuracy", "opening", "forced"] as const)(
-    "neutral classification %s uses shared base without failure or praise blocks",
+  it.each(["opening", "forced"] as const)(
+    "neutral intent for classification %s uses shared base without failure or praise blocks",
     (classification) => {
-      const slice: CommentSlice = { ...VALID_SLICE, classification };
+      const slice: CommentSlice = {
+        ...VALID_SLICE,
+        classification,
+        commentIntent: "neutral",
+        suggestedLength: "brief",
+      };
       const { system, user } = buildPrompt(slice);
 
       expect(system).not.toContain("Primeiro o ERRO");
@@ -181,8 +232,23 @@ describe("buildPrompt", () => {
       expect(system).not.toContain("por que o lance jogado é forte");
       expect(user).not.toContain("por que o lance jogado é ruim");
       expect(user).toContain("Cartão de fatos");
+      expect(user).toContain("comentar o lance de forma neutra");
     },
   );
+
+  it("inaccuracy uses what_was_missed intent even though classification is not failure", () => {
+    const slice: CommentSlice = {
+      ...VALID_SLICE,
+      classification: "inaccuracy",
+      commentIntent: "what_was_missed",
+      suggestedLength: "standard",
+    };
+    const { system } = buildPrompt(slice);
+
+    expect(isFailureClassification("inaccuracy")).toBe(false);
+    expect(system).toContain(HONESTY_RULE);
+    expect(system).not.toContain("Primeiro o ERRO");
+  });
 });
 
 describe("requestOpenRouterComment", () => {

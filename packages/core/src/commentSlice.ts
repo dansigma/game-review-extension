@@ -10,6 +10,43 @@ import type {
   PlayerColor,
 } from "./types.ts";
 
+export type CommentIntent =
+  | "blunder_explanation"
+  | "what_was_missed"
+  | "why_this_move"
+  | "neutral";
+
+export type SuggestedLength = "brief" | "standard";
+
+export function commentIntentForMove(classification: MoveClass): CommentIntent {
+  switch (classification) {
+    case "blunder":
+      return "blunder_explanation";
+    case "mistake":
+    case "miss":
+    case "inaccuracy":
+      return "what_was_missed";
+    case "brilliant":
+    case "great":
+    case "best":
+      return "why_this_move";
+    case "opening":
+    case "forced":
+      return "neutral";
+  }
+}
+
+export function suggestedLengthForIntent(intent: CommentIntent): SuggestedLength {
+  switch (intent) {
+    case "blunder_explanation":
+    case "what_was_missed":
+      return "standard";
+    case "why_this_move":
+    case "neutral":
+      return "brief";
+  }
+}
+
 export interface CommentSlice {
   gameId: string;
   algoVersion: AlgoVersion;
@@ -17,6 +54,9 @@ export interface CommentSlice {
   san: string;
   color: PlayerColor;
   classification: MoveClass;
+  commentIntent: CommentIntent;
+  winPercentDelta: number;
+  suggestedLength: SuggestedLength;
   epl: number;
   accuracy: number | null;
   playerWinPercentBefore: number;
@@ -72,6 +112,9 @@ export function buildCommentSlice(
   const evalAfter = formatMoveEvalAfter(move);
   const evalBefore = formatMoveEvalBefore(move);
   const replyLine = replyLineForMove(review, ply);
+  const commentIntent = commentIntentForMove(move.classification);
+  const winPercentDelta =
+    move.playerWinPercentAfter - move.playerWinPercentBefore;
 
   return {
     gameId: review.gameId,
@@ -80,6 +123,9 @@ export function buildCommentSlice(
     san: move.san,
     color: move.color,
     classification: move.classification,
+    commentIntent,
+    winPercentDelta,
+    suggestedLength: suggestedLengthForIntent(commentIntent),
     epl: move.epl,
     accuracy: move.accuracy,
     playerWinPercentBefore: move.playerWinPercentBefore,
