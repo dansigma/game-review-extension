@@ -1,4 +1,5 @@
 import {
+  criticalMomentCap,
   reviewGame,
   selectCriticalMoments,
   type GameReview,
@@ -28,8 +29,18 @@ export async function reviewGameWithEngine(
   const pass2Nodes = pass2NodesFor(pass1Nodes);
   const nPass1 = args.game.moves.length + 1;
   const pass1Unit = pass1Nodes / ANALYSIS_PROGRESS_NODE_SCALE;
+  const pass1TotalUnits = nodeWeightedUnits(pass1Nodes, nPass1);
 
-  let progressTotal = nodeWeightedUnits(pass1Nodes, nPass1);
+  let progressTotal = pass1TotalUnits;
+  if (pass2Nodes !== null) {
+    const estimatedPass2Count = Math.min(
+      nPass1,
+      criticalMomentCap(args.game.moves.length) * 2,
+    );
+    progressTotal =
+      pass1TotalUnits + nodeWeightedUnits(pass2Nodes, estimatedPass2Count);
+  }
+
   let pass1UnitsDone = 0;
   let pass2UnitsDone = 0;
 
@@ -62,14 +73,15 @@ export async function reviewGameWithEngine(
 
   const criticalMoments = selectCriticalMoments(review.moves);
   if (criticalMoments.length === 0) {
+    progressTotal = pass1TotalUnits;
+    reportProgress();
     return review;
   }
 
   const pass2Indexes = pass2EvalIndexes(criticalMoments);
   const pass2Unit = pass2Nodes / ANALYSIS_PROGRESS_NODE_SCALE;
   progressTotal =
-    nodeWeightedUnits(pass1Nodes, nPass1) +
-    nodeWeightedUnits(pass2Nodes, pass2Indexes.length);
+    pass1TotalUnits + nodeWeightedUnits(pass2Nodes, pass2Indexes.length);
   reportProgress();
 
   for (const index of pass2Indexes) {

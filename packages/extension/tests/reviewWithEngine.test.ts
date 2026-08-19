@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import {
+  criticalMomentCap,
   parsePgn,
   type EngineLine,
   type PositionEval,
@@ -174,6 +175,35 @@ describe("reviewGameWithEngine two-pass orchestration", () => {
     expect(port.analyzePositionCalls.length).toBeGreaterThan(0);
   });
 
+  it("seeds pass-2 weight in total from the first progress callback", async () => {
+    const port = createMockPort(game);
+    const pass1Nodes = nodesForPreset("fast");
+    const pass2Nodes = nodesForPreset("standard");
+    const nPass1 = game.moves.length + 1;
+    const estimatedPass2Count = Math.min(
+      nPass1,
+      criticalMomentCap(game.moves.length) * 2,
+    );
+    const pass1OnlyTotal = Math.round((nPass1 * pass1Nodes) / 1000);
+    const estimatedTotal = Math.round(
+      (nPass1 * pass1Nodes + estimatedPass2Count * pass2Nodes) / 1000,
+    );
+
+    let firstTotal = 0;
+    await reviewGameWithEngine(port, {
+      game,
+      nodesPerPosition: pass1Nodes,
+      onProgress: (_done, total) => {
+        if (firstTotal === 0) {
+          firstTotal = total;
+        }
+      },
+    });
+
+    expect(firstTotal).toBe(estimatedTotal);
+    expect(firstTotal).toBeGreaterThan(pass1OnlyTotal);
+  });
+
   it("node-weights progress across both passes", async () => {
     const port = createMockPort(game);
     const pass1Nodes = nodesForPreset("fast");
@@ -194,6 +224,29 @@ describe("reviewGameWithEngine two-pass orchestration", () => {
       (nPass1 * pass1Nodes + pass2Calls * pass2Nodes) / 1000,
     );
     expect(lastTotal).toBe(expectedTotal);
+  });
+
+  it("uses pass-1-only total for Deep preset", async () => {
+    const port = createMockPort(game);
+    const pass1Nodes = nodesForPreset("deep");
+    const nPass1 = game.moves.length + 1;
+    const pass1OnlyTotal = Math.round((nPass1 * pass1Nodes) / 1000);
+
+    let firstTotal = 0;
+    let lastTotal = 0;
+    await reviewGameWithEngine(port, {
+      game,
+      nodesPerPosition: pass1Nodes,
+      onProgress: (_done, total) => {
+        if (firstTotal === 0) {
+          firstTotal = total;
+        }
+        lastTotal = total;
+      },
+    });
+
+    expect(firstTotal).toBe(pass1OnlyTotal);
+    expect(lastTotal).toBe(pass1OnlyTotal);
   });
 });
 
