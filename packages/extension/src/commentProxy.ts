@@ -31,8 +31,13 @@ function commentEndpoint(baseUrl: string): string {
 }
 
 export function summaryEndpoint(baseUrl: string): string {
-  const path = baseUrl.endsWith("/summary") ? baseUrl : `${baseUrl}/summary`;
-  return path;
+  if (baseUrl.endsWith("/summary")) {
+    return baseUrl;
+  }
+  if (baseUrl.endsWith("/comment")) {
+    return baseUrl.replace(/\/comment$/, "/summary");
+  }
+  return `${baseUrl}/summary`;
 }
 
 export function isCommentUsable(comment: string): boolean {

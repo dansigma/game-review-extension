@@ -17,6 +17,7 @@ export interface OpenRouterTextOptions {
   minLength?: number;
   truncateAgainst?: string;
   failureMessage?: string;
+  leakCheck?: (content: string) => boolean;
 }
 
 export interface OpenRouterSuccess {
@@ -51,12 +52,13 @@ function isTruncatedText(content: string, reference: string): boolean {
   return normalizeSan(content) === normalizeSan(reference);
 }
 
-function leaksEngineNotation(content: string): boolean {
-  return (
-    UCI_MOVE_PATTERN.test(content) ||
-    FEN_PATTERN.test(content) ||
-    EVAL_NUMBER_PATTERN.test(content)
-  );
+function leaksUciOrFen(content: string): boolean {
+  return UCI_MOVE_PATTERN.test(content) || FEN_PATTERN.test(content);
+}
+
+/** Summary output must not copy engine eval numbers into kid-facing text. */
+export function leaksSummaryOutput(content: string): boolean {
+  return leaksUciOrFen(content) || EVAL_NUMBER_PATTERN.test(content);
 }
 
 export async function requestOpenRouterText(
@@ -76,6 +78,7 @@ export async function requestOpenRouterText(
 
   const minLength = options.minLength ?? DEFAULT_MIN_COMMENT_LENGTH;
   const failureMessage = options.failureMessage ?? DEFAULT_FAILURE_MESSAGE;
+  const leakCheck = options.leakCheck ?? leaksUciOrFen;
   const model = env.OPENROUTER_MODEL?.trim() || DEFAULT_MODEL;
 
   try {
@@ -131,7 +134,7 @@ export async function requestOpenRouterText(
       };
     }
 
-    if (leaksEngineNotation(content)) {
+    if (leakCheck(content)) {
       return {
         ok: false,
         status: 502,

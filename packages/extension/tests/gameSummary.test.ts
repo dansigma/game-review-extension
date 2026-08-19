@@ -105,6 +105,12 @@ describe("summaryEndpoint", () => {
       "https://proxy.example/summary",
     );
   });
+
+  it("replaces /comment suffix with /summary", () => {
+    expect(summaryEndpoint("https://proxy.example/comment")).toBe(
+      "https://proxy.example/summary",
+    );
+  });
 });
 
 describe("summaryCacheKey", () => {

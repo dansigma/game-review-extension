@@ -473,7 +473,14 @@ export class GameReviewPanel {
       };
 
       if (!isCommentProxyConfigured()) {
-        await finish(buildFallbackGameSummary(slice), "fallback", "fallback");
+        if (isStale()) {
+          return;
+        }
+        this.gameSummaryState = {
+          kind: "fallback",
+          text: buildFallbackGameSummary(slice),
+        };
+        this.renderGameSummary();
         return;
       }
 

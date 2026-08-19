@@ -320,6 +320,34 @@ describe("requestOpenRouterComment", () => {
     });
   });
 
+  it("allows eval-style phrases in per-move comments", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content:
+                "Você está +2 de material e pode forçar mate em 2 se continuar pressionando.",
+            },
+          },
+        ],
+      }),
+    }));
+
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      comment:
+        "Você está +2 de material e pode forçar mate em 2 se continuar pressionando.",
+    });
+  });
+
   it("returns 502 when model leaks a FEN string", async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: true,

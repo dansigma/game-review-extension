@@ -1,5 +1,6 @@
 import { buildSummaryPrompt } from "./buildSummaryPrompt.ts";
 import {
+  leaksSummaryOutput,
   requestOpenRouterText,
   type OpenRouterEnv,
   type OpenRouterFailure,
@@ -22,6 +23,7 @@ export async function requestOpenRouterSummary(
     {
       minLength: MIN_SUMMARY_LENGTH,
       failureMessage: SUMMARY_FAILURE_MESSAGE,
+      leakCheck: leaksSummaryOutput,
     },
     fetchImpl,
   );
