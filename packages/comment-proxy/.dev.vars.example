@@ -1,3 +1,9 @@
 # Copy to .dev.vars for local wrangler dev (never commit .dev.vars).
 # Production: wrangler secret put OPENROUTER_API_KEY
 OPENROUTER_API_KEY=
+
+# Shared token for the Worker's fail-closed auth (see SIG-701). This is a
+# Worker secret — NEVER commit the real value. Set it with:
+#   wrangler secret put PROXY_AUTH_TOKEN
+# Unset = the Worker refuses all requests (503 "auth não configurado.").
+PROXY_AUTH_TOKEN=

@@ -7,13 +7,28 @@ import {
   CommentProxyError,
   COMMENT_PROXY_TIMEOUT_MS,
   getCommentProxyBaseUrl,
+  getCommentProxyToken,
   isCommentProxyConfigured,
   isCommentUsable,
   proxyUrlFromEnv,
   requestComment,
+  requestGameSummary,
 } from "../src/commentProxy.ts";
 
 const SOURCE_PATH = resolve(import.meta.dirname, "../src/commentProxy.ts");
+
+const TEST_TOKEN = "test-shared-token";
+
+/** Stubs chrome.storage.local with the given proxy token. */
+function stubStorageToken(token: string): void {
+  vi.stubGlobal("chrome", {
+    storage: {
+      local: {
+        get: vi.fn(async () => ({ commentProxyToken: token })),
+      },
+    },
+  });
+}
 
 const LEAK_KEYS = [
   "uci",
@@ -100,6 +115,7 @@ describe("commentProxy configuration", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it("reports unconfigured when env is empty", () => {
@@ -114,9 +130,26 @@ describe("commentProxy configuration", () => {
   });
 });
 
+describe("getCommentProxyToken", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the stored token", async () => {
+    stubStorageToken(TEST_TOKEN);
+    await expect(getCommentProxyToken()).resolves.toBe(TEST_TOKEN);
+  });
+
+  it("returns empty string when storage has no token", async () => {
+    stubStorageToken("");
+    await expect(getCommentProxyToken()).resolves.toBe("");
+  });
+});
+
 describe("requestComment", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_COMMENT_PROXY_URL", "https://proxy.example");
+    stubStorageToken(TEST_TOKEN);
   });
 
   afterEach(() => {
@@ -130,7 +163,18 @@ describe("requestComment", () => {
     await expect(requestComment(SAMPLE_SLICE)).rejects.toThrow("Proxy não configurado");
   });
 
-  it("POSTs slice JSON and returns comment", async () => {
+  it("skips network and throws when token is absent", async () => {
+    stubStorageToken("");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(requestComment(SAMPLE_SLICE)).rejects.toThrow(
+      "Comentários IA não configurados (token ausente).",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("POSTs slice JSON with X-Auth-Token header and returns comment", async () => {
     const fetchMock = vi.fn<
       (input: string, init?: RequestInit) => Promise<{ ok: boolean; json: () => Promise<{ comment: string }> }>
     >(async () => ({
@@ -145,6 +189,8 @@ describe("requestComment", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://proxy.example/comment");
+    const headers = init?.headers as Record<string, string> | undefined;
+    expect(headers?.["X-Auth-Token"]).toBe(TEST_TOKEN);
     const body = JSON.parse(String(init?.body));
     expect(body.san).toBe("e4");
     expect(body).not.toHaveProperty("uci");
@@ -220,6 +266,58 @@ describe("requestComment", () => {
     const init = fetchMock.mock.calls[0]?.[1];
     expect(init?.signal).toBeInstanceOf(AbortSignal);
     expect(COMMENT_PROXY_TIMEOUT_MS).toBe(20_000);
+  });
+});
+
+describe("requestGameSummary", () => {
+  const SAMPLE_SUMMARY = {
+    gameId: "game-1",
+    algoVersion: "1",
+    result: "1-0",
+    whiteAccuracy: 91.2,
+    blackAccuracy: 84.5,
+    judgements: { white: {}, black: {} },
+    moments: [],
+  };
+
+  beforeEach(() => {
+    vi.stubEnv("VITE_COMMENT_PROXY_URL", "https://proxy.example");
+    stubStorageToken(TEST_TOKEN);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("skips network and throws when token is absent", async () => {
+    stubStorageToken("");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      requestGameSummary(SAMPLE_SUMMARY as never),
+    ).rejects.toThrow("Comentários IA não configurados (token ausente).");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("POSTs to /summary with X-Auth-Token header and returns summary", async () => {
+    const fetchMock = vi.fn<
+      (input: string, init?: RequestInit) => Promise<{ ok: boolean; json: () => Promise<{ summary: string }> }>
+    >(async () => ({
+      ok: true,
+      json: async () => ({ summary: "As brancas venceram no final." }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const summary = await requestGameSummary(SAMPLE_SUMMARY as never);
+    expect(summary).toBe("As brancas venceram no final.");
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://proxy.example/summary");
+    const headers = init?.headers as Record<string, string> | undefined;
+    expect(headers?.["X-Auth-Token"]).toBe(TEST_TOKEN);
   });
 });
 

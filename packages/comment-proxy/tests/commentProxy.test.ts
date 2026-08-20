@@ -101,6 +101,79 @@ describe("parseCommentSlice", () => {
     const result = parseCommentSlice({ ...VALID_SLICE, winPercentDelta: Number.NaN });
     expect(result.ok).toBe(false);
   });
+
+  it("rejects engineLine longer than 120 chars", () => {
+    const result = parseCommentSlice({
+      ...VALID_SLICE,
+      engineLine: "Nf3 ".repeat(31).trim(),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Campo acima do limite: engineLine.");
+    }
+  });
+
+  it("rejects san longer than 12 chars", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, san: "Qh4xQh4xQh4xQ" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Campo acima do limite: san.");
+    }
+  });
+
+  it("rejects gameId longer than 64 chars", () => {
+    const result = parseCommentSlice({
+      ...VALID_SLICE,
+      gameId: "x".repeat(65),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Campo acima do limite: gameId.");
+    }
+  });
+
+  it("rejects fenAfter longer than 100 chars", () => {
+    const result = parseCommentSlice({
+      ...VALID_SLICE,
+      fenAfter: `${"8/".repeat(50)}8 w - - 0 1`,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Campo acima do limite: fenAfter.");
+    }
+  });
+
+  it("rejects winPercentAfter above 100", () => {
+    const result = parseCommentSlice({
+      ...VALID_SLICE,
+      playerWinPercentAfter: 101,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("playerWinPercentAfter inválido.");
+    }
+  });
+
+  it("rejects winPercentBefore below 0", () => {
+    const result = parseCommentSlice({
+      ...VALID_SLICE,
+      playerWinPercentBefore: -1,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("playerWinPercentBefore inválido.");
+    }
+  });
+
+  it("rejects accuracy above 100", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, accuracy: 100.5 });
+    expect(result.ok).toBe(false);
+  });
+
+  it("accepts null accuracy", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, accuracy: null });
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("buildPrompt", () => {
@@ -409,5 +482,111 @@ describe("requestOpenRouterComment", () => {
     if (!result.ok) {
       expect(result.status).toBe(502);
     }
+  });
+
+  it("propagates an aborted request signal to the upstream fetch", async () => {
+    const fetchImpl = vi.fn(
+      async (_input: string, init?: RequestInit) => {
+        // Simulate the caller's abort reaching the upstream call.
+        if (init?.signal?.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+        throw new Error("signal was not aborted");
+      },
+    );
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+      controller.signal,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(502);
+    }
+  });
+
+  it("passes a timeout signal to the upstream fetch", async () => {
+    const fetchImpl = vi.fn<
+      (input: string, init?: RequestInit) => Promise<{
+        ok: boolean;
+        json: () => Promise<{ choices: Array<{ message: { content: string } }> }>;
+      }>
+    >(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: "Bom lance, mas impreciso." } }],
+      }),
+    }));
+
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result.ok).toBe(true);
+    const init = fetchImpl.mock.calls[0]?.[1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+    // AbortSignal.any produces a combined signal — timeout fires at 15s.
+    expect((init?.signal as AbortSignal).aborted).toBe(false);
+  });
+
+  it("keeps a kid-safe message and 502 status on upstream 429", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 429 }));
+
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      status: 502,
+      message: "Falha ao gerar comentário.",
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("upstream_ratelimit"),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("logs upstream_auth on upstream 401", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 401 }));
+
+    await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("upstream_auth"),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("logs upstream_error on upstream 5xx", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 500 }));
+
+    await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("upstream_error"),
+    );
+    warnSpy.mockRestore();
   });
 });

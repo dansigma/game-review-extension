@@ -97,6 +97,34 @@ describe("parseGameSummarySlice", () => {
       expect(result.error).toContain("termination");
     }
   });
+
+  it("rejects a moment san longer than 12 chars", () => {
+    const moments = [
+      {
+        ply: 10,
+        san: "Qh4xQh4xQh4xQ",
+        color: "white",
+        classification: "blunder",
+        winPercentSwing: 22.5,
+      },
+    ];
+    const result = parseGameSummarySlice({ ...VALID_SLICE, moments });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a moment winPercentSwing above 100", () => {
+    const moments = [
+      {
+        ply: 10,
+        san: "Qh4",
+        color: "white",
+        classification: "blunder",
+        winPercentSwing: 101,
+      },
+    ];
+    const result = parseGameSummarySlice({ ...VALID_SLICE, moments });
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("buildSummaryPrompt", () => {
@@ -216,29 +244,134 @@ const VALID_COMMENT_SLICE: CommentSlice = {
 };
 
 describe("worker routing", () => {
-  it("routes /summary separately from /comment", async () => {
-    const summaryRequest = new Request("https://worker.test/summary", {
-      method: "POST",
-      headers: {
-        Origin: "chrome-extension://abc",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(VALID_SLICE),
-    });
+  const AUTH_ENV = { PROXY_AUTH_TOKEN: "secret-token" };
 
-    const summaryResponse = await worker.fetch(summaryRequest, {});
+  function authedRequest(
+    path: string,
+    body: unknown,
+    options: { withToken?: boolean } = {},
+  ): Request {
+    const headers: Record<string, string> = {
+      Origin: "chrome-extension://abc",
+      "Content-Type": "application/json",
+    };
+    if (options.withToken !== false) {
+      headers["X-Auth-Token"] = AUTH_ENV.PROXY_AUTH_TOKEN;
+    }
+    return new Request(`https://worker.test${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("routes /summary separately from /comment", async () => {
+    const summaryResponse = await worker.fetch(
+      authedRequest("/summary", VALID_SLICE),
+      AUTH_ENV,
+    );
     expect(summaryResponse.status).toBe(503);
 
-    const commentRequest = new Request("https://worker.test/comment", {
+    const commentResponse = await worker.fetch(
+      authedRequest("/comment", VALID_COMMENT_SLICE),
+      AUTH_ENV,
+    );
+    expect(commentResponse.status).toBe(503);
+  });
+
+  it("returns 503 when the auth token is not configured (fail-closed)", async () => {
+    const response = await worker.fetch(
+      authedRequest("/comment", VALID_COMMENT_SLICE, { withToken: false }),
+      {},
+    );
+    expect(response.status).toBe(503);
+    const body = (await response.json()) as { error?: string };
+    expect(body.error).toBe("auth não configurado.");
+  });
+
+  it("returns 401 when the auth token is wrong", async () => {
+    const response = await worker.fetch(
+      authedRequest("/comment", VALID_COMMENT_SLICE, { withToken: false }),
+      AUTH_ENV,
+    );
+    expect(response.status).toBe(401);
+    const body = (await response.json()) as { error?: string };
+    expect(body.error).toBe("Não autorizado.");
+  });
+
+  it("returns 401 without a token even for a valid body", async () => {
+    const response = await worker.fetch(
+      authedRequest("/comment", VALID_COMMENT_SLICE, { withToken: false }),
+      AUTH_ENV,
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects oversized bodies with 413 before parsing", async () => {
+    const bigSlice = {
+      ...VALID_COMMENT_SLICE,
+      gameId: "x".repeat(17_000),
+    };
+    const request = new Request("https://worker.test/comment", {
       method: "POST",
       headers: {
         Origin: "chrome-extension://abc",
         "Content-Type": "application/json",
+        "X-Auth-Token": AUTH_ENV.PROXY_AUTH_TOKEN,
+        "Content-Length": String(17_000 + 512),
       },
-      body: JSON.stringify(VALID_COMMENT_SLICE),
+      body: JSON.stringify(bigSlice),
     });
 
-    const commentResponse = await worker.fetch(commentRequest, {});
-    expect(commentResponse.status).toBe(503);
+    const response = await worker.fetch(request, AUTH_ENV);
+    expect(response.status).toBe(413);
+    const body = (await response.json()) as { error?: string };
+    expect(body.error).toBe("Corpo grande demais.");
+  });
+
+  it("rejects oversized bodies with 413 when content-length is absent", async () => {
+    const bigSlice = {
+      ...VALID_COMMENT_SLICE,
+      gameId: "x".repeat(17_000),
+    };
+    const request = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: {
+        Origin: "chrome-extension://abc",
+        "Content-Type": "application/json",
+        "X-Auth-Token": AUTH_ENV.PROXY_AUTH_TOKEN,
+      },
+      body: JSON.stringify(bigSlice),
+    });
+
+    const response = await worker.fetch(request, AUTH_ENV);
+    expect(response.status).toBe(413);
+  });
+
+  it("returns 400 for per-field caps after auth", async () => {
+    const request = authedRequest("/comment", {
+      ...VALID_COMMENT_SLICE,
+      engineLine: "Nf3 ".repeat(31).trim(),
+    });
+    const response = await worker.fetch(request, AUTH_ENV);
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error?: string };
+    expect(body.error).toBe("Campo acima do limite: engineLine.");
+  });
+
+  it("lists X-Auth-Token in preflight Access-Control-Allow-Headers", async () => {
+    const preflight = new Request("https://worker.test/comment", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "chrome-extension://abc",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type, x-auth-token",
+      },
+    });
+
+    const response = await worker.fetch(preflight, AUTH_ENV);
+    expect(response.status).toBe(204);
+    const allowHeaders = response.headers.get("Access-Control-Allow-Headers");
+    expect(allowHeaders).toContain("X-Auth-Token");
   });
 });

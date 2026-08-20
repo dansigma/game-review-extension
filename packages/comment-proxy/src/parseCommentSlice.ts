@@ -70,6 +70,21 @@ const OPTIONAL_KEYS: readonly (keyof CommentSlice)[] = [
 
 const ALLOWED_KEYS = new Set<string>([...REQUIRED_KEYS, ...OPTIONAL_KEYS]);
 
+/** Per-field length caps for the comment slice (see SIG-701). */
+const FIELD_CAPS: Record<string, number> = {
+  san: 12,
+  bestSan: 12,
+  gameId: 64,
+  evalAfter: 16,
+  evalBefore: 16,
+  engineLine: 120,
+  replyLine: 120,
+  fenAfter: 100,
+};
+
+const WIN_PERCENT_MIN = 0;
+const WIN_PERCENT_MAX = 100;
+
 export type ParseCommentSliceResult =
   | { ok: true; slice: CommentSlice }
   | { ok: false; error: string };
@@ -163,6 +178,9 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   if (!isString(gameId) || gameId.length === 0) {
     return { ok: false, error: "gameId inválido." };
   }
+  if (gameId.length > FIELD_CAPS.gameId!) {
+    return { ok: false, error: "Campo acima do limite: gameId." };
+  }
   if (algoVersion !== ALGO_VERSION) {
     return { ok: false, error: "algoVersion inválido." };
   }
@@ -171,6 +189,9 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   }
   if (!isString(san) || san.length === 0) {
     return { ok: false, error: "san inválido." };
+  }
+  if (san.length > FIELD_CAPS.san!) {
+    return { ok: false, error: "Campo acima do limite: san." };
   }
   if (!isPlayerColor(color)) {
     return { ok: false, error: "color inválido." };
@@ -190,13 +211,24 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   if (!isNumber(epl) || epl < 0) {
     return { ok: false, error: "epl inválido." };
   }
-  if (!isAccuracy(accuracy)) {
+  if (
+    !isAccuracy(accuracy) ||
+    (accuracy !== null && (accuracy < 0 || accuracy > 100))
+  ) {
     return { ok: false, error: "accuracy inválida." };
   }
-  if (!isNumber(playerWinPercentBefore)) {
+  if (
+    !isNumber(playerWinPercentBefore) ||
+    playerWinPercentBefore < WIN_PERCENT_MIN ||
+    playerWinPercentBefore > WIN_PERCENT_MAX
+  ) {
     return { ok: false, error: "playerWinPercentBefore inválido." };
   }
-  if (!isNumber(playerWinPercentAfter)) {
+  if (
+    !isNumber(playerWinPercentAfter) ||
+    playerWinPercentAfter < WIN_PERCENT_MIN ||
+    playerWinPercentAfter > WIN_PERCENT_MAX
+  ) {
     return { ok: false, error: "playerWinPercentAfter inválido." };
   }
   if (!isBoolean(playedIsBest)) {
@@ -208,20 +240,41 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   if (!isString(evalAfter) || evalAfter.length === 0) {
     return { ok: false, error: "evalAfter inválido." };
   }
-  if (evalBefore !== undefined && !isString(evalBefore)) {
+  if (evalAfter.length > FIELD_CAPS.evalAfter!) {
+    return { ok: false, error: "Campo acima do limite: evalAfter." };
+  }
+  if (
+    evalBefore !== undefined &&
+    (!isString(evalBefore) || evalBefore.length > FIELD_CAPS.evalBefore!)
+  ) {
     return { ok: false, error: "evalBefore inválido." };
   }
-  if (bestSan !== undefined && !isString(bestSan)) {
+  if (
+    bestSan !== undefined &&
+    (!isString(bestSan) || bestSan.length > FIELD_CAPS.bestSan!)
+  ) {
     return { ok: false, error: "bestSan inválido." };
   }
   if (engineLine !== undefined && !isString(engineLine)) {
     return { ok: false, error: "engineLine inválido." };
   }
+  if (engineLine !== undefined && engineLine.length > FIELD_CAPS.engineLine!) {
+    return { ok: false, error: "Campo acima do limite: engineLine." };
+  }
   if (replyLine !== undefined && !isString(replyLine)) {
     return { ok: false, error: "replyLine inválido." };
   }
-  if (fenAfter !== undefined && (!isString(fenAfter) || !fenAfter.includes("/"))) {
+  if (replyLine !== undefined && replyLine.length > FIELD_CAPS.replyLine!) {
+    return { ok: false, error: "Campo acima do limite: replyLine." };
+  }
+  if (
+    fenAfter !== undefined &&
+    (!isString(fenAfter) || !fenAfter.includes("/"))
+  ) {
     return { ok: false, error: "fenAfter inválido." };
+  }
+  if (fenAfter !== undefined && fenAfter.length > FIELD_CAPS.fenAfter!) {
+    return { ok: false, error: "Campo acima do limite: fenAfter." };
   }
 
   const slice: CommentSlice = {

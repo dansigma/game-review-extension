@@ -18,6 +18,8 @@ export interface OpenRouterTextOptions {
   truncateAgainst?: string;
   failureMessage?: string;
   leakCheck?: (content: string) => boolean;
+  /** Client request signal — propagated so a client disconnect aborts the upstream fetch. */
+  signal?: AbortSignal;
 }
 
 export interface OpenRouterSuccess {
@@ -33,6 +35,9 @@ export interface OpenRouterFailure {
 
 const DEFAULT_MIN_COMMENT_LENGTH = 12;
 const DEFAULT_FAILURE_MESSAGE = "Falha ao gerar comentário.";
+
+/** Server-side ceiling for a single upstream call. The extension client aborts at 20s — the server must give up first. */
+const UPSTREAM_TIMEOUT_MS = 15_000;
 
 /** UCI coordinate move (e2e4, g7g8q) — must not appear in coach comments. */
 const UCI_MOVE_PATTERN = /\b[a-h][1-8][a-h][1-8][qrbn]?\b/i;
@@ -82,6 +87,12 @@ export async function requestOpenRouterText(
   const model = env.OPENROUTER_MODEL?.trim() || DEFAULT_MODEL;
 
   try {
+    const startedAt = Date.now();
+    const signals: AbortSignal[] = [AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)];
+    if (options.signal !== undefined) {
+      signals.push(options.signal);
+    }
+    const signal = AbortSignal.any(signals);
     const response = await fetchImpl(OPENROUTER_CHAT_URL, {
       method: "POST",
       headers: {
@@ -101,9 +112,26 @@ export async function requestOpenRouterText(
           exclude: true,
         },
       }),
+      signal,
     });
 
+    const durationMs = Date.now() - startedAt;
+
     if (!response.ok) {
+      const upstreamStatus = response.status;
+      if (upstreamStatus === 401) {
+        console.warn(
+          `upstream_auth method=POST path=${OPENROUTER_CHAT_URL} upstreamStatus=${upstreamStatus} durationMs=${durationMs}`,
+        );
+      } else if (upstreamStatus === 429) {
+        console.warn(
+          `upstream_ratelimit method=POST path=${OPENROUTER_CHAT_URL} upstreamStatus=${upstreamStatus} durationMs=${durationMs}`,
+        );
+      } else if (upstreamStatus >= 500) {
+        console.warn(
+          `upstream_error method=POST path=${OPENROUTER_CHAT_URL} upstreamStatus=${upstreamStatus} durationMs=${durationMs}`,
+        );
+      }
       return {
         ok: false,
         status: 502,
@@ -156,6 +184,7 @@ export async function requestOpenRouterComment(
   slice: Parameters<typeof buildPrompt>[0],
   env: OpenRouterEnv,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<OpenRouterSuccess | OpenRouterFailure> {
   const { system, user } = buildPrompt(slice);
   return requestOpenRouterText(
@@ -165,6 +194,7 @@ export async function requestOpenRouterComment(
       minLength: DEFAULT_MIN_COMMENT_LENGTH,
       truncateAgainst: slice.san,
       failureMessage: DEFAULT_FAILURE_MESSAGE,
+      signal,
     },
     fetchImpl,
   );

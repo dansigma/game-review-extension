@@ -47,6 +47,11 @@ const ALLOWED_KEYS = new Set<string>([
   "finalStanding",
 ]);
 
+/** Per-field caps for the summary slice (see SIG-701). */
+const MOMENT_SAN_MAX = 12;
+const WIN_PERCENT_MIN = 0;
+const WIN_PERCENT_MAX = 100;
+
 export type ParseGameSummarySliceResult =
   | { ok: true; slice: GameSummarySlice }
   | { ok: false; error: string };
@@ -118,13 +123,20 @@ function parseMoment(value: unknown): GameSummaryMoment | null {
   if (!isString(san) || san.length === 0) {
     return null;
   }
+  if (san.length > MOMENT_SAN_MAX) {
+    return null;
+  }
   if (!isPlayerColor(color)) {
     return null;
   }
   if (!isMoveClass(classification)) {
     return null;
   }
-  if (!isNumber(winPercentSwing)) {
+  if (
+    !isNumber(winPercentSwing) ||
+    winPercentSwing < WIN_PERCENT_MIN ||
+    winPercentSwing > WIN_PERCENT_MAX
+  ) {
     return null;
   }
   return { ply, san, color, classification, winPercentSwing };

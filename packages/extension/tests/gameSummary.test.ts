@@ -126,6 +126,13 @@ describe("summaryCacheKey", () => {
 describe("requestGameSummary", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_COMMENT_PROXY_URL", "https://proxy.example");
+    vi.stubGlobal("chrome", {
+      storage: {
+        local: {
+          get: vi.fn(async () => ({ commentProxyToken: "test-token" })),
+        },
+      },
+    });
   });
 
   afterEach(() => {
