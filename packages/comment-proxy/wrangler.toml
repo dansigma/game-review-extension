@@ -5,8 +5,10 @@ compatibility_date = "2025-02-14"
 [vars]
 OPENROUTER_MODEL = "openai/gpt-5.6-luna"
 
-[[unsafe.bindings]]
+[[ratelimits]]
 name = "RATE_LIMITER"
-type = "ratelimit"
 namespace_id = "70101"
-simple = { limit = 6, period = 60 }
+
+  [ratelimits.simple]
+  limit = 6
+  period = 60
