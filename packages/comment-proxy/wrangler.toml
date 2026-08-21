@@ -4,3 +4,8 @@ compatibility_date = "2025-02-14"
 
 [vars]
 OPENROUTER_MODEL = "openai/gpt-5.6-luna"
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"

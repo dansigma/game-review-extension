@@ -9,8 +9,10 @@ import {
   getCommentProxyBaseUrl,
   isCommentProxyConfigured,
   isCommentUsable,
+  proxyTokenFromEnv,
   proxyUrlFromEnv,
   requestComment,
+  requestGameSummary,
 } from "../src/commentProxy.ts";
 
 const SOURCE_PATH = resolve(import.meta.dirname, "../src/commentProxy.ts");
@@ -232,5 +234,90 @@ describe("isCommentUsable", () => {
 
   it("accepts a normal comment length", () => {
     expect(isCommentUsable("Lance sólido no centro.")).toBe(true);
+  });
+});
+
+describe("proxyTokenFromEnv", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_COMMENT_PROXY_TOKEN", "");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns trimmed token from env", () => {
+    vi.stubEnv("VITE_COMMENT_PROXY_TOKEN", "  secret-123  ");
+    expect(proxyTokenFromEnv()).toBe("secret-123");
+  });
+
+  it("returns empty string when not set", () => {
+    expect(proxyTokenFromEnv()).toBe("");
+  });
+});
+
+describe("commentProxy auth header", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_COMMENT_PROXY_URL", "https://proxy.example");
+    vi.stubEnv("VITE_COMMENT_PROXY_TOKEN", "test-token-xyz");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("requestComment sends X-Auth-Token header from VITE_COMMENT_PROXY_TOKEN", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ comment: "Comentário completo do lance." }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestComment(SAMPLE_SLICE);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1] as RequestInit & { headers: Record<string, string> };
+    expect((init.headers as Record<string, string>)["X-Auth-Token"]).toBe("test-token-xyz");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+  });
+
+  it("requestGameSummary sends X-Auth-Token header from VITE_COMMENT_PROXY_TOKEN", async () => {
+    const slice = {
+      gameId: "game-1",
+      algoVersion: ALGO_VERSION,
+      result: "1-0" as const,
+      endReason: "mate" as const,
+      finalStanding: "white_winning" as const,
+      whiteAccuracy: 90,
+      blackAccuracy: 85,
+      judgements: {
+        white: { brilliant: 0, great: 0, best: 2, inaccuracy: 1, mistake: 0, miss: 0, blunder: 1 },
+        black: { brilliant: 0, great: 0, best: 1, inaccuracy: 0, mistake: 1, miss: 0, blunder: 0 },
+      },
+      moments: [],
+    };
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ summary: "As brancas venceram depois de um erro grave no meio do jogo. Partida muito instrutiva." }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestGameSummary(slice);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1] as RequestInit & { headers: Record<string, string> };
+    expect((init.headers as Record<string, string>)["X-Auth-Token"]).toBe("test-token-xyz");
+  });
+
+  it("sends empty X-Auth-Token when env token is empty (server answers 401)", async () => {
+    vi.stubEnv("VITE_COMMENT_PROXY_TOKEN", "");
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ comment: "Comentário completo do lance." }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestComment(SAMPLE_SLICE);
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1] as RequestInit & { headers: Record<string, string> };
+    expect((init.headers as Record<string, string>)["X-Auth-Token"]).toBe("");
   });
 });
