@@ -146,6 +146,9 @@ export class StockfishSession {
 
       let aborted = false;
       const timeout = setTimeout(() => {
+        if (command.startsWith("go ")) {
+          this.sendUci("stop");
+        }
         cleanup();
         reject(new Error(`Timeout waiting for engine after: ${command}`));
       }, 120_000);

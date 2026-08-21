@@ -241,4 +241,73 @@ describe("worker routing", () => {
     const commentResponse = await worker.fetch(commentRequest, {});
     expect(commentResponse.status).toBe(503);
   });
+
+  it("enforces X-Auth-Token when COMMENT_PROXY_TOKEN is set", async () => {
+    const env = { COMMENT_PROXY_TOKEN: "secret-token-123" };
+    const requestNoToken = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: {
+        Origin: "chrome-extension://abc",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(VALID_COMMENT_SLICE),
+    });
+
+    const resNoToken = await worker.fetch(requestNoToken, env);
+    expect(resNoToken.status).toBe(403);
+
+    const requestBadToken = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: {
+        Origin: "chrome-extension://abc",
+        "Content-Type": "application/json",
+        "X-Auth-Token": "wrong-token",
+      },
+      body: JSON.stringify(VALID_COMMENT_SLICE),
+    });
+
+    const resBadToken = await worker.fetch(requestBadToken, env);
+    expect(resBadToken.status).toBe(403);
+
+    const requestValidToken = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: {
+        Origin: "chrome-extension://abc",
+        "Content-Type": "application/json",
+        "X-Auth-Token": "secret-token-123",
+      },
+      body: JSON.stringify(VALID_COMMENT_SLICE),
+    });
+
+    const resValidToken = await worker.fetch(requestValidToken, env);
+    expect(resValidToken.status).toBe(503); // Passed auth, reached OpenRouter missing key
+  });
+
+  it("enforces ALLOWED_EXTENSION_ID when configured", async () => {
+    const env = { ALLOWED_EXTENSION_ID: "my-allowed-id" };
+
+    const reqDisallowed = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: {
+        Origin: "chrome-extension://other-id",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(VALID_COMMENT_SLICE),
+    });
+
+    const resDisallowed = await worker.fetch(reqDisallowed, env);
+    expect(resDisallowed.status).toBe(403);
+
+    const reqAllowed = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: {
+        Origin: "chrome-extension://my-allowed-id",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(VALID_COMMENT_SLICE),
+    });
+
+    const resAllowed = await worker.fetch(reqAllowed, env);
+    expect(resAllowed.status).toBe(503);
+  });
 });

@@ -95,7 +95,7 @@ export async function requestOpenRouterText(
           { role: "user", content: prompt.user },
         ],
         temperature: 0.4,
-        max_tokens: 2048,
+        max_tokens: 500,
         reasoning: {
           effort: "low",
           exclude: true,

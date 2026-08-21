@@ -101,6 +101,19 @@ describe("parseCommentSlice", () => {
     const result = parseCommentSlice({ ...VALID_SLICE, winPercentDelta: Number.NaN });
     expect(result.ok).toBe(false);
   });
+
+  it("rejects string fields exceeding maximum length bounds", () => {
+    expect(parseCommentSlice({ ...VALID_SLICE, gameId: "a".repeat(65) }).ok).toBe(false);
+    expect(parseCommentSlice({ ...VALID_SLICE, san: "b".repeat(17) }).ok).toBe(false);
+    expect(parseCommentSlice({ ...VALID_SLICE, engineLine: "c".repeat(257) }).ok).toBe(false);
+    expect(parseCommentSlice({ ...VALID_SLICE, replyLine: "d".repeat(257) }).ok).toBe(false);
+    expect(
+      parseCommentSlice({
+        ...VALID_SLICE,
+        fenAfter: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 " + "e".repeat(35),
+      }).ok,
+    ).toBe(false);
+  });
 });
 
 describe("buildPrompt", () => {
@@ -287,7 +300,7 @@ describe("requestOpenRouterComment", () => {
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toContain("openrouter.ai");
     const payload = JSON.parse(String(init?.body));
-    expect(payload.max_tokens).toBe(2048);
+    expect(payload.max_tokens).toBe(500);
     expect(payload.reasoning).toEqual({ effort: "low", exclude: true });
     expect(payload.messages[1].content).toContain("Cartão de fatos");
     expect(JSON.stringify(payload)).not.toContain("uci");

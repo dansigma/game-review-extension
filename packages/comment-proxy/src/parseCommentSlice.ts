@@ -160,7 +160,7 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
     fenAfter,
   } = body;
 
-  if (!isString(gameId) || gameId.length === 0) {
+  if (!isString(gameId) || gameId.length === 0 || gameId.length > 64) {
     return { ok: false, error: "gameId inválido." };
   }
   if (algoVersion !== ALGO_VERSION) {
@@ -169,7 +169,7 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   if (!isNumber(ply) || ply < 0 || !Number.isInteger(ply)) {
     return { ok: false, error: "ply inválido." };
   }
-  if (!isString(san) || san.length === 0) {
+  if (!isString(san) || san.length === 0 || san.length > 16) {
     return { ok: false, error: "san inválido." };
   }
   if (!isPlayerColor(color)) {
@@ -214,13 +214,16 @@ export function parseCommentSlice(body: unknown): ParseCommentSliceResult {
   if (bestSan !== undefined && !isString(bestSan)) {
     return { ok: false, error: "bestSan inválido." };
   }
-  if (engineLine !== undefined && !isString(engineLine)) {
+  if (engineLine !== undefined && (!isString(engineLine) || engineLine.length > 256)) {
     return { ok: false, error: "engineLine inválido." };
   }
-  if (replyLine !== undefined && !isString(replyLine)) {
+  if (replyLine !== undefined && (!isString(replyLine) || replyLine.length > 256)) {
     return { ok: false, error: "replyLine inválido." };
   }
-  if (fenAfter !== undefined && (!isString(fenAfter) || !fenAfter.includes("/"))) {
+  if (
+    fenAfter !== undefined &&
+    (!isString(fenAfter) || !fenAfter.includes("/") || fenAfter.length > 90)
+  ) {
     return { ok: false, error: "fenAfter inválido." };
   }
 

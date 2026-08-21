@@ -91,6 +91,32 @@ describe("ensureOffscreenDocument", () => {
     resolveCreate?.();
     await Promise.all([first, second]);
   });
+
+  it("schedules idle timer and closes document after 5 minutes", async () => {
+    vi.useFakeTimers();
+    const closeDocument = vi.fn().mockResolvedValue(undefined);
+
+    const chromeApi = {
+      runtime: {
+        getURL: (path: string) => `chrome-extension://test/${path}`,
+        getContexts: vi.fn().mockResolvedValue([]),
+      },
+      offscreen: {
+        createDocument: vi.fn().mockResolvedValue(undefined),
+        closeDocument,
+      },
+    };
+
+    const { scheduleOffscreenIdleTimer } = await import("../src/offscreenDocument.ts");
+    scheduleOffscreenIdleTimer(300_000, chromeApi as any);
+
+    expect(closeDocument).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(300_000);
+
+    expect(closeDocument).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
 });
 
 describe("analysis job state", () => {
@@ -143,6 +169,47 @@ describe("analysis job state", () => {
 describe("background analysis-start", () => {
   afterEach(() => {
     resetAnalysisJobStateForTests();
+  });
+
+  it("persists analysis state to storage.session and rehydrates state", async () => {
+    const {
+      getAnalysisJobState,
+      ingestAnalysisBroadcast,
+      rehydrateAnalysisState,
+      ANALYSIS_STATE_STORAGE_KEY,
+    } = await import("../src/backgroundAnalysis.ts");
+
+    let storedData: Record<string, any> = {};
+    const storageApi = {
+      set: vi.fn(async (items: Record<string, any>) => {
+        storedData = { ...storedData, ...items };
+      }),
+      get: vi.fn(async (key: string) => ({ [key]: storedData[key] })),
+    } as any;
+
+    ingestAnalysisBroadcast({
+      type: "analysis-progress",
+      gameId: "test-game-123",
+      done: 2,
+      total: 10,
+    });
+
+    const currentState = getAnalysisJobState();
+    expect(currentState.state).toBe("running");
+
+    const { saveAnalysisStateToStorage } = await import("../src/backgroundAnalysis.ts");
+    saveAnalysisStateToStorage(storageApi);
+
+    expect(storageApi.set).toHaveBeenCalledWith({
+      [ANALYSIS_STATE_STORAGE_KEY]: currentState,
+    });
+
+    resetAnalysisJobStateForTests();
+    expect(getAnalysisJobState().state).toBe("idle");
+
+    const rehydrated = await rehydrateAnalysisState(storageApi);
+    expect(rehydrated.state).toBe("running");
+    expect((rehydrated as any).gameId).toBe("test-game-123");
   });
 
   it("does not throw and forwards to offscreen", async () => {

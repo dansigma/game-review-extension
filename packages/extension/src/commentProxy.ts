@@ -13,6 +13,10 @@ export function proxyUrlFromEnv(): string {
   return import.meta.env.VITE_COMMENT_PROXY_URL?.trim() ?? "";
 }
 
+export function proxyTokenFromEnv(): string {
+  return import.meta.env.VITE_COMMENT_PROXY_TOKEN?.trim() ?? "";
+}
+
 export function isCommentProxyConfigured(): boolean {
   return proxyUrlFromEnv().length > 0;
 }
@@ -61,9 +65,15 @@ export async function requestComment(slice: CommentSlice): Promise<string> {
   );
 
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = proxyTokenFromEnv();
+    if (token) {
+      headers["X-Auth-Token"] = token;
+    }
+
     const response = await fetch(commentEndpoint(baseUrl), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(slice),
       signal: controller.signal,
     });
@@ -116,9 +126,15 @@ export async function requestGameSummary(slice: GameSummarySlice): Promise<strin
   );
 
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = proxyTokenFromEnv();
+    if (token) {
+      headers["X-Auth-Token"] = token;
+    }
+
     const response = await fetch(summaryEndpoint(baseUrl), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(slice),
       signal: controller.signal,
     });
