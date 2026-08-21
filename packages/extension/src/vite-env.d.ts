@@ -5,6 +5,7 @@ declare module "*.svg?raw" {
 
 interface ImportMetaEnv {
   readonly VITE_COMMENT_PROXY_URL?: string;
+  readonly VITE_COMMENT_PROXY_TOKEN?: string;
 }
 
 interface ImportMeta {

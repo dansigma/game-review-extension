@@ -217,16 +217,22 @@ const VALID_COMMENT_SLICE: CommentSlice = {
 
 describe("worker routing", () => {
   it("routes /summary separately from /comment", async () => {
+    const testAuth = "test-token-123";
+    const mockRateLimiter = { limit: vi.fn(async () => ({ success: true })) };
+    const env = { AUTH_TOKEN: testAuth, RATE_LIMITER: mockRateLimiter };
+
     const summaryRequest = new Request("https://worker.test/summary", {
       method: "POST",
       headers: {
         Origin: "chrome-extension://abc",
         "Content-Type": "application/json",
+        "CF-Connecting-IP": "1.2.3.4",
+        "X-Auth-Token": testAuth,
       },
       body: JSON.stringify(VALID_SLICE),
     });
 
-    const summaryResponse = await worker.fetch(summaryRequest, {});
+    const summaryResponse = await worker.fetch(summaryRequest, env);
     expect(summaryResponse.status).toBe(503);
 
     const commentRequest = new Request("https://worker.test/comment", {
@@ -234,11 +240,13 @@ describe("worker routing", () => {
       headers: {
         Origin: "chrome-extension://abc",
         "Content-Type": "application/json",
+        "CF-Connecting-IP": "1.2.3.4",
+        "X-Auth-Token": testAuth,
       },
       body: JSON.stringify(VALID_COMMENT_SLICE),
     });
 
-    const commentResponse = await worker.fetch(commentRequest, {});
+    const commentResponse = await worker.fetch(commentRequest, env);
     expect(commentResponse.status).toBe(503);
   });
 });

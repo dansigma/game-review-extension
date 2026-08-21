@@ -13,6 +13,10 @@ export function proxyUrlFromEnv(): string {
   return import.meta.env.VITE_COMMENT_PROXY_URL?.trim() ?? "";
 }
 
+export function proxyTokenFromEnv(): string {
+  return import.meta.env.VITE_COMMENT_PROXY_TOKEN?.trim() ?? "";
+}
+
 export function isCommentProxyConfigured(): boolean {
   return proxyUrlFromEnv().length > 0;
 }
@@ -63,7 +67,7 @@ export async function requestComment(slice: CommentSlice): Promise<string> {
   try {
     const response = await fetch(commentEndpoint(baseUrl), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Auth-Token": proxyTokenFromEnv() },
       body: JSON.stringify(slice),
       signal: controller.signal,
     });
@@ -118,7 +122,7 @@ export async function requestGameSummary(slice: GameSummarySlice): Promise<strin
   try {
     const response = await fetch(summaryEndpoint(baseUrl), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Auth-Token": proxyTokenFromEnv() },
       body: JSON.stringify(slice),
       signal: controller.signal,
     });

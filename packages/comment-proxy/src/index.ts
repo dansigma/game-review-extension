@@ -3,8 +3,14 @@ import { parseGameSummarySlice } from "./parseGameSummarySlice.ts";
 import { requestOpenRouterComment, type OpenRouterEnv } from "./openrouter.ts";
 import { requestOpenRouterSummary } from "./summaryOpenrouter.ts";
 
-export interface Env extends OpenRouterEnv {}
+export interface RateLimitBinding {
+  limit(input: { key: string }): Promise<{ success: boolean }>;
+}
 
+export interface Env extends OpenRouterEnv {
+  AUTH_TOKEN?: string;
+  RATE_LIMITER?: RateLimitBinding;
+}
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
 function isAllowedOrigin(origin: string | null): boolean {
@@ -29,7 +35,7 @@ function corsHeaders(origin: string | null): HeadersInit {
   return {
     "Access-Control-Allow-Origin": origin!,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-Auth-Token",
     "Access-Control-Max-Age": "86400",
   };
 }
@@ -43,6 +49,22 @@ function jsonResponse(
     status,
     headers: { ...JSON_HEADERS, ...corsHeaders(origin) },
   });
+}
+
+export function isAuthorized(request: Request, env: Env): boolean {
+  const token = env.AUTH_TOKEN;
+  if (typeof token !== "string" || token.length === 0) {
+    return false;
+  }
+  const header = request.headers.get("X-Auth-Token") ?? "";
+  if (header.length !== token.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < token.length; i++) {
+    diff |= header.charCodeAt(i) ^ token.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 async function handleComment(request: Request, env: Env): Promise<Response> {
@@ -112,6 +134,19 @@ export default {
 
     if (request.method !== "POST") {
       return jsonResponse(405, { error: "Método não permitido." }, origin);
+    }
+
+    if (!env.RATE_LIMITER) {
+      return jsonResponse(500, { error: "Rate limiter não configurado." }, origin);
+    }
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const rateResult = await env.RATE_LIMITER.limit({ key: ip });
+    if (!rateResult.success) {
+      return jsonResponse(429, { error: "Muitas requisições. Tente novamente mais tarde." }, origin);
+    }
+
+    if (!isAuthorized(request, env)) {
+      return jsonResponse(401, { error: "Não autorizado." }, origin);
     }
 
     if (url.pathname === "/" || url.pathname === "/comment") {
