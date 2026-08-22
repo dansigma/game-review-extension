@@ -71,6 +71,7 @@ export async function handleAnalysisStart(
     sendOffscreenCommand: (command) => chrome.runtime.sendMessage(command),
   },
 ): Promise<{ started: boolean }> {
+  cancelOffscreenIdleTimer();
   if (
     shouldIgnoreDuplicateAnalysisStart(analysisState, {
       gameId: message.game.gameId,

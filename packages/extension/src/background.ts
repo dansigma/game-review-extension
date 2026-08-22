@@ -20,14 +20,22 @@ import {
   ingestAnalysisBroadcast,
   rehydrateAnalysisState,
 } from "./backgroundAnalysis.ts";
+import { scheduleOffscreenIdleTimer } from "./offscreenDocument.ts";
+
+// Rehydrate persisted analysis state at SW startup so a restart does not
+// silently reset a running job. If the restored state is still running,
+// re-arm the alarms-based offscreen idle-close timer so a later terminal
+// broadcast still closes the document.
+try {
+  const restored = await rehydrateAnalysisState();
+  if (restored.state === "running") {
+    scheduleOffscreenIdleTimer();
+  }
+} catch {
+  // Keep default IDLE state on rehydration failure
+}
 
 const SESSION_KEY = "activeGameId";
-
-// Restore analysis state after MV3 service-worker restart (alarms survive termination,
-// setTimeout does not). Rehydrating before handling messages ensures a terminal
-// broadcast that arrives after restart still sees prevState==='running' and can
-// schedule the offscreen idle-close alarm.
-void rehydrateAnalysisState().catch(() => {});
 
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })

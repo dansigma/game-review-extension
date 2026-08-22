@@ -170,3 +170,84 @@ describe("background analysis-start", () => {
     });
   });
 });
+
+describe("offscreen idle alarm (chrome.alarms)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetOffscreenCreateGuardForTests();
+  });
+
+  it("scheduleOffscreenIdleTimer creates alarm with delayInMinutes 5 and registers onAlarm listener", async () => {
+    const create = vi.fn();
+    const clear = vi.fn(async () => true);
+    let alarmCallback: (a: { name: string }) => void = () => {};
+    const addListener = vi.fn((cb: (a: { name: string }) => void) => { alarmCallback = cb; });
+    const closeDocument = vi.fn(async () => {});
+    vi.stubGlobal("chrome", {
+      runtime: { getURL: (p: string) => `chrome-extension://test/${p}`, getContexts: vi.fn(async () => []) },
+      offscreen: { createDocument: vi.fn(async () => {}), closeDocument },
+      alarms: { create, clear, onAlarm: { addListener } },
+    });
+    const mod = await import("../src/offscreenDocument.ts");
+    mod.resetOffscreenCreateGuardForTests();
+    // re-import to reset listener flag
+    const { scheduleOffscreenIdleTimer, OFFSCREEN_IDLE_ALARM_NAME } = mod;
+    scheduleOffscreenIdleTimer(undefined, (globalThis as unknown as { chrome: unknown }).chrome as never);
+    expect(create).toHaveBeenCalledWith(OFFSCREEN_IDLE_ALARM_NAME, { delayInMinutes: 5 });
+    expect(addListener).toHaveBeenCalled();
+    alarmCallback({ name: OFFSCREEN_IDLE_ALARM_NAME });
+    expect(closeDocument).toHaveBeenCalled();
+  });
+
+  it("cancelOffscreenIdleTimer clears the alarm", async () => {
+    const clear = vi.fn(async () => true);
+    const create = vi.fn();
+    vi.stubGlobal("chrome", {
+      runtime: { getURL: (p: string) => `chrome-extension://test/${p}`, getContexts: vi.fn(async () => []) },
+      offscreen: { createDocument: vi.fn(async () => {}) },
+      alarms: { create, clear, onAlarm: { addListener: vi.fn() } },
+    });
+    const { cancelOffscreenIdleTimer, OFFSCREEN_IDLE_ALARM_NAME } = await import("../src/offscreenDocument.ts");
+    cancelOffscreenIdleTimer((globalThis as unknown as { chrome: unknown }).chrome as never);
+    expect(clear).toHaveBeenCalledWith(OFFSCREEN_IDLE_ALARM_NAME);
+  });
+
+  it("handleAnalysisStart clears previous alarm", async () => {
+    const clear = vi.fn(async () => true);
+    const create = vi.fn();
+    vi.stubGlobal("chrome", {
+      runtime: { getURL: (p: string) => `chrome-extension://test/${p}`, getContexts: vi.fn(async () => []) },
+      offscreen: { createDocument: vi.fn(async () => {}), closeDocument: vi.fn(async () => {}) },
+      alarms: { create, clear, onAlarm: { addListener: vi.fn() } },
+      storage: { session: { get: vi.fn(async () => ({})), set: vi.fn(async () => {}) } },
+    });
+    const game = parsePgn(`[Event "Test"]\n\n1. e4 e5 1/2-1/2`);
+    const ensureOffscreen = vi.fn(async () => {});
+    const sendOffscreenCommand = vi.fn(async () => ({}));
+    const { handleAnalysisStart } = await import("../src/backgroundAnalysis.ts");
+    await handleAnalysisStart({ type: "analysis-start", game, nodesPerPosition: 400000 }, { ensureOffscreen, sendOffscreenCommand });
+    expect(clear).toHaveBeenCalled();
+  });
+
+  it("rehydrateAnalysisState restores running state and terminal broadcast re-arms alarm", async () => {
+    const storageData: Record<string, unknown> = { analysisState: { state: "running", gameId: "g123", nodesPerPosition: 400000 } };
+    const storageApi = { get: vi.fn(async (key: string) => ({ [key]: storageData[key] })), set: vi.fn(async () => {}) } as unknown as typeof chrome.storage.session;
+    const { rehydrateAnalysisState, getAnalysisJobState, resetAnalysisJobStateForTests } = await import("../src/backgroundAnalysis.ts");
+    resetAnalysisJobStateForTests();
+    const restored = await rehydrateAnalysisState(storageApi);
+    expect(restored.state).toBe("running");
+    expect(getAnalysisJobState().state).toBe("running");
+    const create = vi.fn();
+    const clear = vi.fn(async () => true);
+    vi.stubGlobal("chrome", {
+      runtime: { getURL: (p: string) => `chrome-extension://test/${p}`, getContexts: vi.fn(async () => []) },
+      offscreen: { createDocument: vi.fn(async () => {}), closeDocument: vi.fn(async () => {}) },
+      alarms: { create, clear, onAlarm: { addListener: vi.fn() } },
+      storage: { session: storageApi as unknown as typeof chrome.storage.session },
+    });
+    const { ingestAnalysisBroadcast } = await import("../src/backgroundAnalysis.ts");
+    ingestAnalysisBroadcast({ type: "analysis-complete", gameId: "g123", review: {} as never });
+    expect(create).toHaveBeenCalledWith("offscreen-idle-close", { delayInMinutes: 5 });
+    resetAnalysisJobStateForTests();
+  });
+});
