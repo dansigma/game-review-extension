@@ -13,9 +13,35 @@ import type {
   AnalysisStatusData,
   OffscreenCommand,
 } from "./messages.ts";
-import { ensureOffscreenDocument } from "./offscreenDocument.ts";
+import {
+  cancelOffscreenIdleTimer,
+  ensureOffscreenDocument,
+  scheduleOffscreenIdleTimer,
+} from "./offscreenDocument.ts";
+
+export const ANALYSIS_STATE_STORAGE_KEY = "analysisState";
 
 let analysisState: AnalysisJobState = IDLE_ANALYSIS_STATE;
+
+export function saveAnalysisStateToStorage(
+  storageApi: typeof chrome.storage.session = globalThis.chrome?.storage?.session,
+): void {
+  void storageApi?.set?.({ [ANALYSIS_STATE_STORAGE_KEY]: analysisState })?.catch(() => {});
+}
+
+export async function rehydrateAnalysisState(
+  storageApi: typeof chrome.storage.session = globalThis.chrome?.storage?.session,
+): Promise<AnalysisJobState> {
+  try {
+    const data = await storageApi?.get?.(ANALYSIS_STATE_STORAGE_KEY);
+    if (data && data[ANALYSIS_STATE_STORAGE_KEY]) {
+      analysisState = data[ANALYSIS_STATE_STORAGE_KEY] as AnalysisJobState;
+    }
+  } catch {
+    // Keep default state on storage error
+  }
+  return analysisState;
+}
 
 export function getAnalysisJobState(): AnalysisJobState {
   return analysisState;
@@ -23,10 +49,16 @@ export function getAnalysisJobState(): AnalysisJobState {
 
 export function resetAnalysisJobStateForTests(): void {
   analysisState = IDLE_ANALYSIS_STATE;
+  cancelOffscreenIdleTimer();
 }
 
 export function ingestAnalysisBroadcast(broadcast: AnalysisBroadcast): void {
+  const prevState = analysisState.state;
   analysisState = applyAnalysisBroadcast(analysisState, broadcast);
+  if (prevState === "running" && analysisState.state === "idle") {
+    scheduleOffscreenIdleTimer();
+  }
+  saveAnalysisStateToStorage();
 }
 
 export async function handleAnalysisStart(
@@ -56,6 +88,7 @@ export async function handleAnalysisStart(
   }
 
   analysisState = markAnalysisStarting(message.game.gameId, message.nodesPerPosition);
+  saveAnalysisStateToStorage();
 
   await deps.sendOffscreenCommand({
     type: "offscreen-analysis-start",
@@ -82,6 +115,8 @@ export async function handleAnalysisCancel(
 
   await deps.ensureOffscreen();
   await deps.sendOffscreenCommand({ type: "offscreen-analysis-cancel" });
+  scheduleOffscreenIdleTimer();
+  saveAnalysisStateToStorage();
 }
 
 export function handleAnalysisStatus(): AnalysisStatusData {

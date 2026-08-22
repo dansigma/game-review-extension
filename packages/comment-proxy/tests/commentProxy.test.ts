@@ -287,7 +287,7 @@ describe("requestOpenRouterComment", () => {
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toContain("openrouter.ai");
     const payload = JSON.parse(String(init?.body));
-    expect(payload.max_tokens).toBe(2048);
+    expect(payload.max_tokens).toBe(500);
     expect(payload.reasoning).toEqual({ effort: "low", exclude: true });
     expect(payload.messages[1].content).toContain("Cartão de fatos");
     expect(JSON.stringify(payload)).not.toContain("uci");

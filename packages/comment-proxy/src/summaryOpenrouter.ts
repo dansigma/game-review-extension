@@ -15,6 +15,7 @@ export async function requestOpenRouterSummary(
   slice: GameSummarySlice,
   env: OpenRouterEnv,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<OpenRouterSuccess | OpenRouterFailure> {
   const prompt = buildSummaryPrompt(slice);
   return requestOpenRouterText(
@@ -24,6 +25,7 @@ export async function requestOpenRouterSummary(
       minLength: MIN_SUMMARY_LENGTH,
       failureMessage: SUMMARY_FAILURE_MESSAGE,
       leakCheck: leaksSummaryOutput,
+      signal,
     },
     fetchImpl,
   );
