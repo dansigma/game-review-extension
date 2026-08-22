@@ -177,11 +177,10 @@ describe("offscreen idle alarm (chrome.alarms)", () => {
     resetOffscreenCreateGuardForTests();
   });
 
-  it("scheduleOffscreenIdleTimer creates alarm with delayInMinutes 5 and registers onAlarm listener", async () => {
+  it("scheduleOffscreenIdleTimer creates alarm with delayInMinutes 5", async () => {
     const create = vi.fn();
     const clear = vi.fn(async () => true);
-    let alarmCallback: (a: { name: string }) => void = () => {};
-    const addListener = vi.fn((cb: (a: { name: string }) => void) => { alarmCallback = cb; });
+    const addListener = vi.fn();
     const closeDocument = vi.fn(async () => {});
     vi.stubGlobal("chrome", {
       runtime: { getURL: (p: string) => `chrome-extension://test/${p}`, getContexts: vi.fn(async () => []) },
@@ -190,13 +189,11 @@ describe("offscreen idle alarm (chrome.alarms)", () => {
     });
     const mod = await import("../src/offscreenDocument.ts");
     mod.resetOffscreenCreateGuardForTests();
-    // re-import to reset listener flag
     const { scheduleOffscreenIdleTimer, OFFSCREEN_IDLE_ALARM_NAME } = mod;
     scheduleOffscreenIdleTimer(undefined, (globalThis as unknown as { chrome: unknown }).chrome as never);
     expect(create).toHaveBeenCalledWith(OFFSCREEN_IDLE_ALARM_NAME, { delayInMinutes: 5 });
-    expect(addListener).toHaveBeenCalled();
-    alarmCallback({ name: OFFSCREEN_IDLE_ALARM_NAME });
-    expect(closeDocument).toHaveBeenCalled();
+    // Listener is now at SW top level (background.ts), not via scheduleOffscreenIdleTimer
+    expect(addListener).not.toHaveBeenCalled();
   });
 
   it("cancelOffscreenIdleTimer clears the alarm", async () => {
@@ -249,5 +246,59 @@ describe("offscreen idle alarm (chrome.alarms)", () => {
     ingestAnalysisBroadcast({ type: "analysis-complete", gameId: "g123", review: {} as never });
     expect(create).toHaveBeenCalledWith("offscreen-idle-close", { delayInMinutes: 5 });
     resetAnalysisJobStateForTests();
+  });
+
+  it("restart-idle: alarm still closes offscreen after SW wake with idle state (top-level listener)", async () => {
+    vi.resetModules();
+    const closeDocument = vi.fn(async () => {});
+    let alarmCallback: (alarm: { name: string }) => void = () => {};
+    const addListener = vi.fn((cb: (alarm: { name: string }) => void) => {
+      alarmCallback = cb;
+    });
+    const create = vi.fn();
+    const clear = vi.fn(async () => true);
+    // Storage returns idle state
+    const storageGet = vi.fn(async (key: string) => {
+      if (key === "analysisState") return { analysisState: { state: "idle" } };
+      return {};
+    });
+    const storageSet = vi.fn(async () => {});
+
+    vi.stubGlobal("chrome", {
+      runtime: {
+        getURL: (p: string) => `chrome-extension://test/${p}`,
+        getContexts: vi.fn(async () => []),
+        onMessage: { addListener: vi.fn() },
+        sendMessage: vi.fn(),
+      },
+      offscreen: {
+        createDocument: vi.fn(async () => {}),
+        closeDocument,
+      },
+      alarms: { create, clear, onAlarm: { addListener } },
+      storage: { session: { get: storageGet, set: storageSet } },
+      sidePanel: {
+        setPanelBehavior: vi.fn(async () => {}),
+        setOptions: vi.fn(async () => {}),
+        open: vi.fn(async () => {}),
+      },
+    });
+
+    // Fresh SW: import background.ts (top-level registers onAlarm unconditionally)
+    await import("../src/background.ts");
+    // Allow top-level await rehydrate to settle
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(addListener).toHaveBeenCalledTimes(1);
+
+    // Simulate pending alarm firing into freshly-woken SW with idle state
+    expect(create).not.toHaveBeenCalled();
+    alarmCallback({ name: "offscreen-idle-close" });
+    expect(closeDocument).toHaveBeenCalledTimes(1);
+
+    // Non-matching alarm names should not close
+    closeDocument.mockClear();
+    alarmCallback({ name: "other-alarm" });
+    expect(closeDocument).not.toHaveBeenCalled();
   });
 });

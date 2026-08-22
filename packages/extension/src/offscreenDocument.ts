@@ -34,7 +34,6 @@ export interface OffscreenChrome {
 
 let creatingOffscreen: Promise<void> | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
-let alarmListenerRegistered = false;
 
 function getAlarmsApi(
   chromeApi: OffscreenChrome = globalThis.chrome as unknown as OffscreenChrome,
@@ -42,20 +41,11 @@ function getAlarmsApi(
   return (chromeApi as OffscreenChrome)?.alarms ?? (globalThis.chrome as unknown as OffscreenChrome)?.alarms;
 }
 
-function ensureAlarmListener(
+export function closeOffscreenDocument(
   chromeApi: OffscreenChrome = globalThis.chrome as unknown as OffscreenChrome,
-): void {
-  if (alarmListenerRegistered) return;
-  const alarms = getAlarmsApi(chromeApi);
-  if (!alarms?.onAlarm?.addListener) return;
-  alarms.onAlarm.addListener((alarm: { name: string }) => {
-    if (alarm.name === OFFSCREEN_IDLE_ALARM_NAME) {
-      void (chromeApi as OffscreenChrome)?.offscreen?.closeDocument?.();
-      // Also try global chrome as fallback
-      void (globalThis.chrome as unknown as OffscreenChrome)?.offscreen?.closeDocument?.();
-    }
-  });
-  alarmListenerRegistered = true;
+): Promise<void> {
+  const target = (chromeApi as OffscreenChrome)?.offscreen ?? (globalThis.chrome as unknown as OffscreenChrome)?.offscreen;
+  return (target?.closeDocument?.() as Promise<void>) ?? Promise.resolve();
 }
 
 export function cancelOffscreenIdleTimer(
@@ -77,7 +67,6 @@ export function scheduleOffscreenIdleTimer(
   if (alarms?.create) {
     const delayInMinutes = timeoutMs / 60000;
     alarms.create(OFFSCREEN_IDLE_ALARM_NAME, { delayInMinutes });
-    ensureAlarmListener(chromeApi);
     return;
   }
   idleTimer = setTimeout(() => {
@@ -90,10 +79,8 @@ export function getOffscreenIdleTimerForTests(): ReturnType<typeof setTimeout> |
   return idleTimer;
 }
 
-/** Test-only: reset alarm listener registration. */
-export function resetOffscreenAlarmListenerForTests(): void {
-  alarmListenerRegistered = false;
-}
+/** Test-only: reset alarm listener registration (no-op after top-level registration move, kept for compat). */
+export function resetOffscreenAlarmListenerForTests(): void {}
 
 export async function ensureOffscreenDocument(
   chromeApi: OffscreenChrome = globalThis.chrome as unknown as OffscreenChrome,
