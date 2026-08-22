@@ -18,9 +18,16 @@ import {
   handleAnalysisStart,
   handleAnalysisStatus,
   ingestAnalysisBroadcast,
+  rehydrateAnalysisState,
 } from "./backgroundAnalysis.ts";
 
 const SESSION_KEY = "activeGameId";
+
+// Restore analysis state after MV3 service-worker restart (alarms survive termination,
+// setTimeout does not). Rehydrating before handling messages ensures a terminal
+// broadcast that arrives after restart still sees prevState==='running' and can
+// schedule the offscreen idle-close alarm.
+void rehydrateAnalysisState().catch(() => {});
 
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })

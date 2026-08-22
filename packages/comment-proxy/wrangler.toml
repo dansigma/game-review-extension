@@ -4,6 +4,10 @@ compatibility_date = "2025-02-14"
 
 [vars]
 OPENROUTER_MODEL = "openai/gpt-5.6-luna"
+# Optional origin allowlist: exact chrome-extension://<id> to allow (plus localhost/127.0.0.1).
+# When unset, any chrome-extension://* origin is allowed (permissive fallback).
+# Uncomment and set your extension id for strict pinning:
+# ALLOWED_EXTENSION_ID = "abcdefghijklmnopqrstuvwxyz123456"
 
 [[ratelimits]]
 name = "RATE_LIMITER"
