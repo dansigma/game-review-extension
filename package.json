@@ -7,14 +7,16 @@
   "workspaces": [
     "packages/core",
     "packages/extension",
-    "packages/comment-proxy"
+    "packages/comment-proxy",
+    "packages/benchmark"
   ],
   "scripts": {
-    "test": "npm run test -w @game-review/core && npm run test -w @game-review/extension && npm run test -w @game-review/comment-proxy",
-    "typecheck": "npm run typecheck -w @game-review/core && npm run typecheck -w @game-review/extension && npm run typecheck -w @game-review/comment-proxy",
+    "test": "npm run test -w @game-review/core && npm run test -w @game-review/extension && npm run test -w @game-review/comment-proxy && npm run test -w @game-review/benchmark",
+    "typecheck": "npm run typecheck -w @game-review/core && npm run typecheck -w @game-review/extension && npm run typecheck -w @game-review/comment-proxy && npm run typecheck -w @game-review/benchmark",
     "build:extension": "npm run build -w @game-review/extension",
     "poc:lichess": "npm run poc:lichess -w @game-review/extension",
-    "poc:budget": "npm run poc:budget -w @game-review/extension"
+    "poc:budget": "npm run poc:budget -w @game-review/extension",
+    "eval:benchmark": "npm run eval -w @game-review/benchmark"
   },
   "engines": {
     "node": ">=20"
