@@ -18,7 +18,32 @@ import {
   handleAnalysisStart,
   handleAnalysisStatus,
   ingestAnalysisBroadcast,
+  rehydrateAnalysisState,
 } from "./backgroundAnalysis.ts";
+import {
+  closeOffscreenDocument,
+  OFFSCREEN_IDLE_ALARM_NAME,
+  scheduleOffscreenIdleTimer,
+} from "./offscreenDocument.ts";
+
+// Register onAlarm listener unconditionally at SW top level so it survives
+// a restart where persisted state is idle (alarm may still be pending).
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === OFFSCREEN_IDLE_ALARM_NAME) void closeOffscreenDocument();
+});
+
+// Rehydrate persisted analysis state at SW startup so a restart does not
+// silently reset a running job. If the restored state is still running,
+// re-arm the alarms-based offscreen idle-close timer so a later terminal
+// broadcast still closes the document.
+try {
+  const restored = await rehydrateAnalysisState();
+  if (restored.state === "running") {
+    scheduleOffscreenIdleTimer();
+  }
+} catch {
+  // Keep default IDLE state on rehydration failure
+}
 
 const SESSION_KEY = "activeGameId";
 

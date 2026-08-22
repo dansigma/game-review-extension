@@ -250,3 +250,51 @@ describe("worker routing", () => {
     expect(commentResponse.status).toBe(503);
   });
 });
+
+describe("hardening: summary worker body-cap and field caps", () => {
+  const AUTH = "secret-token-123";
+  const makeEnv = () => ({
+    AUTH_TOKEN: AUTH,
+    RATE_LIMITER: { limit: vi.fn(async () => ({ success: true })) },
+    OPENROUTER_API_KEY: "test-key",
+  });
+  it("413 via large summary body post-parse with valid auth", async () => {
+    const bigSlice = { ...VALID_SLICE, gameId: "x".repeat(17_000) };
+    const req = new Request("https://worker.test/summary", {
+      method: "POST",
+      headers: { Origin: "chrome-extension://abc", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH },
+      body: JSON.stringify(bigSlice),
+    });
+    const res = await worker.fetch(req, makeEnv() as never);
+    expect(res.status).toBe(413);
+  });
+  it("rejects summary moments san>12 after auth", async () => {
+    const slice = { ...VALID_SLICE, moments: [{ ply:10, san:"Qh4xQh4xQh4xQ", color:"white", classification:"blunder", winPercentSwing:22.5 } as const] };
+    const req = new Request("https://worker.test/summary", {
+      method: "POST",
+      headers: { Origin: "chrome-extension://abc", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH },
+      body: JSON.stringify(slice),
+    });
+    const res = await worker.fetch(req, makeEnv() as never);
+    expect(res.status).toBe(400);
+  });
+  it("upstream timeout signal propagates in summary path", async () => {
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return { ok: true, json: async () => ({ choices: [{ message: { content: "As brancas venceram depois de um erro grave. Partida instrutiva." } }] }) } as Response;
+    });
+    const result = await requestOpenRouterSummary(VALID_SLICE, { OPENROUTER_API_KEY: "test-key" }, fetchImpl as unknown as typeof fetch);
+    expect(result.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalled();
+  });
+  it("origin allowlist: summary rejects wrong extension id", async () => {
+    const env = { AUTH_TOKEN: AUTH, RATE_LIMITER: { limit: vi.fn(async () => ({ success: true })) }, ALLOWED_EXTENSION_ID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", OPENROUTER_API_KEY: "test-key" };
+    const req = new Request("https://worker.test/summary", {
+      method: "POST",
+      headers: { Origin: "chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH },
+      body: JSON.stringify(VALID_SLICE),
+    });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(403);
+  });
+});

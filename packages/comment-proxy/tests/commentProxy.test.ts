@@ -287,7 +287,7 @@ describe("requestOpenRouterComment", () => {
     const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toContain("openrouter.ai");
     const payload = JSON.parse(String(init?.body));
-    expect(payload.max_tokens).toBe(2048);
+    expect(payload.max_tokens).toBe(500);
     expect(payload.reasoning).toEqual({ effort: "low", exclude: true });
     expect(payload.messages[1].content).toContain("Cartão de fatos");
     expect(JSON.stringify(payload)).not.toContain("uci");
@@ -409,5 +409,176 @@ describe("requestOpenRouterComment", () => {
     if (!result.ok) {
       expect(result.status).toBe(502);
     }
+  });
+
+  it("propagates an aborted request signal to the upstream fetch", async () => {
+    const fetchImpl = vi.fn(async (_input: string, init?: RequestInit) => {
+      if (init?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      throw new Error("signal was not aborted");
+    });
+    const controller = new AbortController();
+    controller.abort();
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+      controller.signal,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(502);
+  });
+
+  it("passes a timeout signal to the upstream fetch", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "Bom lance, mas impreciso." } }] }),
+    }));
+    const result = await requestOpenRouterComment(
+      VALID_SLICE,
+      { OPENROUTER_API_KEY: "test-key" },
+      fetchImpl as unknown as typeof fetch,
+    );
+    expect(result.ok).toBe(true);
+    const init = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit] | undefined)?.[1];
+    expect((init as { signal?: AbortSignal })?.signal).toBeInstanceOf(AbortSignal);
+    expect(((init as { signal?: AbortSignal })?.signal as AbortSignal).aborted).toBe(false);
+  });
+});
+
+describe("hardening: field caps via parseCommentSlice", () => {
+  it("rejects san longer than 12 chars", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, san: "Qh4xQh4xQh4xQ" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("Campo acima do limite: san.");
+  });
+  it("rejects gameId longer than 64 chars", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, gameId: "x".repeat(65) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("Campo acima do limite: gameId.");
+  });
+  it("rejects engineLine longer than 256 chars", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, engineLine: "e4 ".repeat(90) });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("Campo acima do limite: engineLine.");
+  });
+  it("rejects fenAfter longer than 100 chars", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, fenAfter: `${"8/".repeat(50)}8 w - - 0 1` });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("Campo acima do limite: fenAfter.");
+  });
+  it("rejects accuracy above 100", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, accuracy: 100.5 });
+    expect(result.ok).toBe(false);
+  });
+  it("rejects winPercentAfter above 100", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, playerWinPercentAfter: 101 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("playerWinPercentAfter inválido.");
+  });
+  it("rejects winPercentBefore below 0", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, playerWinPercentBefore: -1 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("playerWinPercentBefore inválido.");
+  });
+  it("accepts null accuracy", () => {
+    const result = parseCommentSlice({ ...VALID_SLICE, accuracy: null });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("hardening: worker body-cap 413 with auth flow", () => {
+  const AUTH = "secret-token-123";
+  const makeEnv = () => ({
+    AUTH_TOKEN: AUTH,
+    RATE_LIMITER: { limit: vi.fn(async () => ({ success: true })) },
+    OPENROUTER_API_KEY: "test-key",
+  });
+  function authed(path: string, body: unknown, extraHeaders: Record<string,string>={}) {
+    return new Request(`https://worker.test${path}`, {
+      method: "POST",
+      headers: { Origin: "chrome-extension://abc", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH, ...extraHeaders },
+      body: JSON.stringify(body),
+    });
+  }
+  it("413 via Content-Length header (pre-parse) with valid auth", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const bigSlice = { ...VALID_SLICE, gameId: "x".repeat(17_000) };
+    const req = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: { Origin: "chrome-extension://abc", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH, "Content-Length": String(17_000 + 512) },
+      body: JSON.stringify(bigSlice),
+    });
+    const res = await worker.fetch(req, makeEnv() as never);
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as {error:string}).error).toBe("Corpo grande demais.");
+  });
+  it("413 via post-parse JSON.stringify length with valid auth", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const bigSlice = { ...VALID_SLICE, gameId: "x".repeat(17_000) };
+    const req = authed("/comment", bigSlice);
+    const res = await worker.fetch(req, makeEnv() as never);
+    expect(res.status).toBe(413);
+  });
+  it("400 for field cap san>12 after auth passes", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const req = authed("/comment", { ...VALID_SLICE, san: "Qh4xQh4xQh4xQ" });
+    const res = await worker.fetch(req, makeEnv() as never);
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as {error:string}).error).toBe("Campo acima do limite: san.");
+  });
+  it("400 for engineLine>256 after auth", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const req = authed("/comment", { ...VALID_SLICE, engineLine: "e4 ".repeat(90) });
+    const res = await worker.fetch(req, makeEnv() as never);
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("hardening: origin allowlist", () => {
+  const AUTH = "secret-token-123";
+  const baseEnv = { AUTH_TOKEN: AUTH, RATE_LIMITER: { limit: vi.fn(async () => ({ success: true })) }, OPENROUTER_API_KEY: "test-key" };
+  it("exact ALLOWED_EXTENSION_ID match passes", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const env = { ...baseEnv, ALLOWED_EXTENSION_ID: "abcdefghijklmnopqrstu1234567890ab" };
+    const req = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: { Origin: "chrome-extension://abcdefghijklmnopqrstu1234567890ab", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH },
+      body: JSON.stringify(VALID_SLICE),
+    });
+    const res = await worker.fetch(req, env as never);
+    // Should reach handler (503 no key would be different but we have key -> 200), not 403
+    expect(res.status).not.toBe(403);
+  });
+  it("wrong extension id with ALLOWED_EXTENSION_ID set → 403", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const env = { ...baseEnv, ALLOWED_EXTENSION_ID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+    const req = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: { Origin: "chrome-extension://bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH },
+      body: JSON.stringify(VALID_SLICE),
+    });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).toBe(403);
+  });
+  it("localhost fallback passes even when allowlist set", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const env = { ...baseEnv, ALLOWED_EXTENSION_ID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
+    const req = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: { Origin: "http://localhost:5173", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH },
+      body: JSON.stringify(VALID_SLICE),
+    });
+    const res = await worker.fetch(req, env as never);
+    expect(res.status).not.toBe(403);
+  });
+  it("permissive fallback when unset: any chrome-extension origin passes", async () => {
+    const { default: worker } = await import("../src/index.ts");
+    const req = new Request("https://worker.test/comment", {
+      method: "POST",
+      headers: { Origin: "chrome-extension://random-id-123", "Content-Type": "application/json", "CF-Connecting-IP": "1.2.3.4", "X-Auth-Token": AUTH },
+      body: JSON.stringify(VALID_SLICE),
+    });
+    const res = await worker.fetch(req, baseEnv as never);
+    expect(res.status).not.toBe(403);
   });
 });

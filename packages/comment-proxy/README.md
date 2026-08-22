@@ -22,6 +22,28 @@ wrangler secret put OPENROUTER_MODEL   # or set [vars] OPENROUTER_MODEL
 
 Local dev: copy `.dev.vars.example` to `.dev.vars` and set `OPENROUTER_API_KEY` and `AUTH_TOKEN`.
 
+## Origin allowlist
+
+`ALLOWED_EXTENSION_ID` optionally pins the CORS allowlist to a single extension origin:
+
+- When set to an extension id (e.g. `abcdefghijklmnopqrstuvwxyz123456`), only `chrome-extension://<id>` plus `http://localhost` / `http://127.0.0.1` are allowed — all other origins get `403 { "error": "Origem não permitida." }`.
+- When unset (default), any `chrome-extension://*` origin is allowed plus `localhost`/`127.0.0.1` (permissive fallback). This is intentional for local dev but means production hardening silently no-ops unless the variable is set.
+
+Configure via secret or `[vars]`:
+
+```bash
+wrangler secret put ALLOWED_EXTENSION_ID   # value: your extension id (no chrome-extension:// prefix)
+```
+
+Or in `wrangler.toml`:
+
+```toml
+[vars]
+ALLOWED_EXTENSION_ID = "abcdefghijklmnopqrstuvwxyz123456"
+```
+
+For local dev, set `ALLOWED_EXTENSION_ID` in `.dev.vars` (see `.dev.vars.example`).
+
 ## Authentication
 
 All `POST` requests to `/comment` and `/summary` require the header:

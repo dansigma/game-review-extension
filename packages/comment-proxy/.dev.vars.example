@@ -2,3 +2,6 @@
 # Production: wrangler secret put OPENROUTER_API_KEY
 OPENROUTER_API_KEY=
 AUTH_TOKEN=
+# Optional: pin allowed extension origin to chrome-extension://<id> (plus localhost fallback).
+# When unset, any chrome-extension://* is allowed.
+# ALLOWED_EXTENSION_ID=
