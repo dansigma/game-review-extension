@@ -17,10 +17,29 @@ describe("benchmark computeMetrics", () => {
     expect(m.tp).toBe(2);
     expect(m.fn).toBe(1);
     expect(m.fp).toBe(3);
+    expect(m.engineFailures).toBe(0);
     expect(m.recall).toBeCloseTo(2 / 3);
     expect(m.precision).toBeCloseTo(2 / 5);
     // fpPer1000 = 3*1000/(210-3)
     expect(m.fpPer1000).toBeCloseTo((3 * 1000) / 207);
+  });
+
+  it("excludes engine failures from FN and recall denominator", () => {
+    const perGame: PerGameResult[] = [
+      { gameIndex: 0, answerPly: 10, isTP: true, isFN: false, falsePositives: [], totalPlies: 60 },
+      { gameIndex: 1, answerPly: 20, isTP: false, isFN: true, falsePositives: [], totalPlies: 70 },
+      { gameIndex: 2, answerPly: 30, isTP: false, isFN: false, falsePositives: [], totalPlies: 0, error: "engine failure after retry: timeout", engineFailure: true },
+    ];
+    const totalPlies = 130; // only non-failed games contribute
+    const m = computeMetrics(perGame, totalPlies, 3);
+    expect(m.tp).toBe(1);
+    expect(m.fn).toBe(1);
+    expect(m.engineFailures).toBe(1);
+    expect(m.fp).toBe(0);
+    // recall = tp / (answerCount - engineFailures) = 1 / 2
+    expect(m.recall).toBeCloseTo(1 / 2);
+    // TP + FN + engineFailures should equal totalGames
+    expect(m.tp + m.fn + m.engineFailures).toBe(3);
   });
 
   it("dataset fixture exists and has 100 entries with correct shape", () => {

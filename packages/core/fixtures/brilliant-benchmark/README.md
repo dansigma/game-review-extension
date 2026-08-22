@@ -18,6 +18,12 @@ https://www.chessigma.com/benchmarks/brilliant
 
 Reference range over free tools (as published on the benchmark page): recall 23–93/100, precision 51–95%, incorrect brilliant calls per 1,000 ordinary moves 0.7–4.2.
 
+## Baseline vs production — reduced-config disclaimer
+
+> **Reduced-config baseline — not production-equivalent.** The published baseline in `results.md`/`results.json` used Stockfish 16 binary at 50,000 nodes/position, single pass, no pass-2. Production (`reviewGameWithEngine` in `packages/extension/src/reviewWithEngine.ts`) uses sf_18 WASM (`MVP_ENGINE_ID=\"sf_18\"`) at 400,000 nodes (`MVP_NODES_PER_POSITION`) plus pass-2 critical-moment re-analysis (`selectCriticalMoments`/`pass2EvalIndexes`). The benchmark reuses the same `classifyMove`/`reviewGame` gating as production, but the 3/100 recall measures the reduced config, not extension production performance.
+
+Deviations recorded in `results.md` Notes: (1) engine version Stockfish 16 binary vs sf_18 WASM, (2) 50k single-pass vs 400k + pass-2, (3) missing `selectCriticalMoments`/`pass2EvalIndexes` refinement.
+
 ## Usage
 
 - Fixture is committed verbatim; do not edit.

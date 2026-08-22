@@ -8,13 +8,15 @@ export const DATASET_REL = "packages/core/fixtures/brilliant-benchmark/chessigma
 
 export function computeMetrics(perGame: PerGameResult[], totalPlies: number, answerCount: number): GlobalMetrics {
   const tp = perGame.filter((g) => g.isTP).length;
+  const engineFailures = perGame.filter((g) => g.engineFailure).length;
   const fn = perGame.filter((g) => g.isFN).length;
   const fp = perGame.reduce((sum, g) => sum + g.falsePositives.length, 0);
-  const recall = answerCount > 0 ? tp / answerCount : 0;
+  const denominator = answerCount - engineFailures;
+  const recall = denominator > 0 ? tp / denominator : 0;
   const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
   const ordinaryMoves = totalPlies - answerCount;
   const fpPer1000 = ordinaryMoves > 0 ? (fp * 1000) / ordinaryMoves : 0;
-  return { totalGames: perGame.length, tp, fn, fp, recall, precision, fpPer1000, totalPlies };
+  return { totalGames: perGame.length, tp, fn, fp, recall, precision, fpPer1000, totalPlies, engineFailures };
 }
 
 export async function evaluateOneGame(
@@ -35,9 +37,6 @@ export async function evaluateOneGame(
     for (let ply = 0; ply < fens.length; ply++) {
       const fen = fens[ply]!;
       const ev = await engine.analyzePosition({ fen, nodes: nodesPerPosition, multipv: BENCHMARK_MULTIPV });
-      // engine returns ply 0 placeholder; fix to actual ply index
-      ev.ply = ply - 1; // PositionEval ply: -1 for start, 0 for after first move, etc. But reviewGame expects evals[0] ply -1? Let's see: reviewGame graphs start at ply -1. We'll set consistently: evals index i corresponds to position before move i (for i < moves.length) and after last move.
-      // Actually PositionEval ply field is just for debugging; reviewGame doesn't use it except for error messages. We'll set evals[i].ply = i-1
       ev.ply = ply - 1;
       evals.push(ev);
     }
@@ -93,7 +92,7 @@ export async function evaluateAll(
       const engine = new StockfishBinaryEngine(opts.enginePath);
       try {
         await engine.init();
-        enginePath = (engine as unknown as { enginePath: string }).enginePath ?? enginePath;
+        enginePath = engine.enginePath ?? enginePath;
         res = await evaluateOneGame(input, i, engine, nodesPerPosition);
         engine.dispose();
         break;
@@ -108,10 +107,11 @@ export async function evaluateAll(
             gameIndex: i,
             answerPly: input.ply,
             isTP: false,
-            isFN: true,
+            isFN: false,
             falsePositives: [],
             totalPlies: 0,
             error: `engine failure after retry: ${msg}`,
+            engineFailure: true,
           };
         } else {
           await new Promise((r) => setTimeout(r, 500));

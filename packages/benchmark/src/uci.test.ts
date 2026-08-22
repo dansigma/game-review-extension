@@ -18,15 +18,27 @@ describe("uci parseInfoLine", () => {
     expect(parseInfoLine("bestmove e2e4")).toBeNull();
     expect(parseInfoLine("uciok")).toBeNull();
   });
-  it("stockfish binary exists at expected path", () => {
+  it.skipIf(
+    (() => {
+      const candidates = [
+        "/tmp/stockfish/stockfish-ubuntu-x86-64-avx2",
+        resolve(dirname(fileURLToPath(import.meta.url)), "../../..", "stockfish"),
+      ];
+      const envPath = process.env.STOCKFISH_PATH;
+      return !(
+        candidates.some((p) => existsSync(p)) ||
+        (envPath ? existsSync(envPath) : false)
+      );
+    })(),
+  )("stockfish binary exists at expected path", () => {
     const candidates = [
       "/tmp/stockfish/stockfish-ubuntu-x86-64-avx2",
       resolve(dirname(fileURLToPath(import.meta.url)), "../../..", "stockfish"),
     ];
-    // This test just ensures harness will find a binary; skip if none found (CI without binary)
-    const found = candidates.some((p) => existsSync(p));
-    // We don't fail if no binary in unit test env; just check parse logic
-    expect(true).toBe(true);
-    void found;
+    const envPath = process.env.STOCKFISH_PATH;
+    const found =
+      candidates.some((p) => existsSync(p)) ||
+      (envPath ? existsSync(envPath) : false);
+    expect(found).toBe(true);
   });
 });

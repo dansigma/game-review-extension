@@ -6,7 +6,6 @@ import type { EngineLine, PositionEval } from "../../core/src/types.ts";
 export const BENCHMARK_NODES_PER_POSITION = 50_000;
 export const BENCHMARK_MULTIPV = 2;
 export const BENCHMARK_ENGINE_ID = "sf_16_nodes_50k";
-export const BENCHMARK_DEPTH_FALLBACK = 12;
 
 function findStockfishBinary(): string | null {
   const env = process.env.STOCKFISH_PATH;
@@ -113,17 +112,17 @@ export class StockfishBinaryEngine {
       this.buffer = this.buffer.slice(idx + 1);
       if (!line) continue;
       // Try to resolve waiters
-      let consumed = false;
       for (let i = 0; i < this.waiters.length; i++) {
         const waiter = this.waiters[i];
         if (waiter && waiter(line)) {
           // waiter returns true when its condition is satisfied
-          // but we keep lineQueue for info collection
         }
       }
       this.lineQueue.push(line);
-      // Also notify any pending collector via event loop
-      void consumed;
+      // Prevent unbounded growth: keep only recent lines (engine output is consumed via waiters)
+      if (this.lineQueue.length > 1000) {
+        this.lineQueue.splice(0, this.lineQueue.length - 500);
+      }
     }
   }
 
@@ -163,51 +162,63 @@ export class StockfishBinaryEngine {
     const infos: UciInfo[] = [];
     let bestMoveSeen = false;
 
-    // We need to collect info lines until bestmove
-    // Use a Promise that resolves on bestmove
-    const collected = await new Promise<UciInfo[]>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        cleanup();
-        reject(new Error(`Timeout analyzing position fen=${args.fen.slice(0, 40)}`));
-      }, 15000);
+    // Track abort listener so it can be removed in finally
+    let abortHandler: (() => void) | null = null;
 
-      const onLine = (line: string): boolean => {
-        if (line.startsWith("info ")) {
-          const info = parseInfoLine(line);
-          if (info) infos.push(info);
-        }
-        if (isBestMove(line)) {
-          bestMoveSeen = true;
+    try {
+      const collected = await new Promise<UciInfo[]>((resolve, reject) => {
+        const timer = setTimeout(() => {
           cleanup();
-          resolve([...infos]);
-          return true;
+          reject(new Error(`Timeout analyzing position fen=${args.fen.slice(0, 40)}`));
+        }, 15000);
+
+        const onLine = (line: string): boolean => {
+          if (line.startsWith("info ")) {
+            const info = parseInfoLine(line);
+            if (info) infos.push(info);
+          }
+          if (isBestMove(line)) {
+            bestMoveSeen = true;
+            cleanup();
+            resolve([...infos]);
+            return true;
+          }
+          return false;
+        };
+
+        const cleanup = () => {
+          clearTimeout(timer);
+          const idx = this.waiters.indexOf(onLine as unknown as (line: string) => boolean);
+          if (idx >= 0) this.waiters.splice(idx, 1);
+        };
+
+        this.waiters.push(onLine as unknown as (line: string) => boolean);
+        this.send(`go nodes ${nodes}`);
+        // also listen for abort
+        if (args.signal) {
+          abortHandler = () => {
+            try {
+              this.send("stop");
+            } catch {}
+            cleanup();
+            reject(new DOMException("Aborted", "AbortError"));
+          };
+          args.signal.addEventListener("abort", abortHandler);
         }
-        return false;
-      };
-
-      const cleanup = () => {
-        clearTimeout(timer);
-        const idx = this.waiters.indexOf(onLine as unknown as (line: string) => boolean);
-        if (idx >= 0) this.waiters.splice(idx, 1);
-      };
-
-      this.waiters.push(onLine as unknown as (line: string) => boolean);
-      this.send(`go nodes ${nodes}`);
-      // also listen for abort
-      args.signal?.addEventListener("abort", () => {
-        try {
-          this.send("stop");
-        } catch {}
-        cleanup();
-        reject(new DOMException("Aborted", "AbortError"));
       });
-    });
 
-    if (!bestMoveSeen && collected.length === 0) {
-      throw new Error("No engine output for position");
+      if (!bestMoveSeen && collected.length === 0) {
+        throw new Error("No engine output for position");
+      }
+      // Use a synthetic ply 0 here; caller will set correct ply
+      return buildPositionEval(args.fen, 0, collected);
+    } finally {
+      if (args.signal && abortHandler) {
+        args.signal.removeEventListener("abort", abortHandler);
+      }
+      // Clear lineQueue per message batch so it doesn't grow unbounded across many positions
+      this.lineQueue.length = 0;
     }
-    // Use a synthetic ply 0 here; caller will set correct ply
-    return buildPositionEval(args.fen, 0, collected);
   }
 
   dispose(): void {

@@ -1,7 +1,9 @@
 # Brilliant Benchmark Results
 
-- Engine: `/tmp/stockfish/stockfish-ubuntu-x86-64-avx2` (`sf_16_nodes_50k`)
-- Nodes per position: 50000 (MultiPV=2)
+> **Reduced-config baseline — not production-equivalent.** This run used a Stockfish 16 binary at 50,000 nodes/position, single pass, no pass-2. Production (`reviewGameWithEngine` in `packages/extension/src/reviewWithEngine.ts`) uses sf_18 WASM at 400,000 nodes plus pass-2 critical-moment re-analysis (`selectCriticalMoments`/`pass2EvalIndexes`). The 3/100 recall below measures this reduced config, not the extension's production performance.
+
+- Engine: `/tmp/stockfish/stockfish-ubuntu-x86-64-avx2` (`sf_16_nodes_50k`) — Stockfish 16 binary (production uses sf_18 WASM)
+- Nodes per position: 50000 single-pass, no pass-2 (production: 400,000 nodes + pass-2 refinement)
 - Dataset: chessigma-100 (100 games, 7552 plies)
 - Generated: 2026-08-22T00:09:45.160Z
 - Wall-clock: 1146.9s (~19.1 min)
@@ -10,7 +12,7 @@
 
 | Metric | Value |
 |---|---|
-| Recall (TP/100) | 3/100 = 3.0% |
+| Recall — reduced-config baseline, not production-equivalent (TP/100) | 3/100 = 3.0% |
 | Precision (TP/(TP+FP)) | 3/6 = 50.0% |
 | FP per 1000 ordinary moves | 0.40 |
 | TP | 3 |
@@ -129,5 +131,5 @@
 ## Notes
 
 - Ply indexing: dataset ply is 1-based halfmove; harness maps to 0-based `NormalizedMove.ply` as `ply-1`. Sanity-checked against first game in log.
-- Classification uses same `classifyMove` + `reviewGame` + sacrifice/only-move gating as production (via `@game-review/core`).
-- Engine budget capped at nodes=50000 to keep 100-game run under 60 min; deviation from production default (400k nodes) is recorded here.
+- Classification uses same `classifyMove` + `reviewGame` + sacrifice/only-move gating as production (via `@game-review/core`), but engine evaluation differs — see deviations above. The 3/100 recall quantifies the reduced-config baseline, not production.
+- Deviations from production that affect the reported metrics: (1) engine version Stockfish 16 binary vs production sf_18 WASM (`MVP_ENGINE_ID=\"sf_18\"` in `packages/extension/src/budgetDecision.ts`), (2) node budget 50,000 single-pass vs production 400,000 (`MVP_NODES_PER_POSITION`), (3) no pass-2 critical-moment re-analysis (`selectCriticalMoments`/`pass2EvalIndexes` in `reviewGameWithEngine.ts` — skipped entirely). MultiPV=2 matches production.

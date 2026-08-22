@@ -14,6 +14,7 @@ export interface PerGameResult {
   falsePositives: Array<{ ply: number; san: string; uci: string; classification: string }>;
   totalPlies: number;
   error?: string;
+  engineFailure?: boolean;
 }
 
 export interface GlobalMetrics {
@@ -21,10 +22,11 @@ export interface GlobalMetrics {
   tp: number;
   fn: number;
   fp: number;
-  recall: number; // TP/100
+  recall: number; // TP / (totalGames - engineFailures)
   precision: number; // TP/(TP+FP)
   fpPer1000: number; // FP*1000 / (totalPlies - answerPlies)
   totalPlies: number;
+  engineFailures: number;
 }
 
 export interface BenchmarkResults {
