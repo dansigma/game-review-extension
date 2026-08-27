@@ -6,8 +6,10 @@ import { fileURLToPath } from "node:url";
 const root = dirname(fileURLToPath(import.meta.url));
 
 function proxyHostPermission(proxyUrl: string): string | null {
+  const trimmed = proxyUrl.trim();
+  if (!trimmed) return null;
   try {
-    const parsed = new URL(proxyUrl);
+    const parsed = new URL(trimmed);
     if (parsed.protocol !== "https:") {
       return null;
     }
@@ -51,9 +53,12 @@ export default defineConfig(({ mode }) => {
         name: "extension-static",
         closeBundle() {
           const dist = resolve(root, "dist");
-          const manifest = JSON.parse(
-            readFileSync(resolve(root, "manifest.json"), "utf8"),
-          ) as { host_permissions?: string[] };
+          let manifest: { host_permissions?: string[] };
+          try {
+            manifest = JSON.parse(readFileSync(resolve(root, "manifest.json"), "utf8")) as { host_permissions?: string[] };
+          } catch {
+            return;
+          }
           const permission = proxyHostPermission(proxyUrl);
           if (permission) {
             const existing = manifest.host_permissions ?? [];
@@ -61,10 +66,7 @@ export default defineConfig(({ mode }) => {
               manifest.host_permissions = [...existing, permission];
             }
           }
-          writeFileSync(
-            resolve(dist, "manifest.json"),
-            JSON.stringify(manifest, null, 2),
-          );
+          writeFileSync(resolve(dist, "manifest.json"), JSON.stringify(manifest, null, 2));
         },
       },
       {

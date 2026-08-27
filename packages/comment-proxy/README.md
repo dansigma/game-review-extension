@@ -61,10 +61,13 @@ X-Auth-Token: <AUTH_TOKEN>
 Uses the Workers built-in Rate Limiting binding declared in `wrangler.toml`:
 
 ```toml
-[[unsafe.bindings]]
+[[ratelimits]]
 name = "RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "1001"
+namespace_id = "70101"
+
+  [ratelimits.simple]
+  limit = 6
+  period = 60
 ```
 
 - Key: client IP from the `CF-Connecting-IP` header.

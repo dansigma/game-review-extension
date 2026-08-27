@@ -34,24 +34,18 @@ export class ReviewEngineError extends Error {
 }
 
 function sideToMoveFromFen(fen: string): PlayerColor {
-  const parts = fen.split(" ");
-  const stm = parts[1];
-  if (stm === "w") {
-    return "white";
-  }
-  if (stm === "b") {
-    return "black";
-  }
+  const stm = fen.split(" ")[1];
+  if (stm === "w") return "white";
+  if (stm === "b") return "black";
   throw new ReviewEngineError(`Cannot read side to move from FEN: ${fen}`);
 }
 
-function startColorFromFen(fen: string): PlayerColor {
-  return sideToMoveFromFen(fen);
+function sortedLines(position: PositionEval): EngineLine[] {
+  return [...position.lines].sort((a, b) => a.multipv - b.multipv);
 }
 
 function bestLine(position: PositionEval): EngineLine {
-  const sorted = [...position.lines].sort((a, b) => a.multipv - b.multipv);
-  const line = sorted[0];
+  const line = sortedLines(position)[0];
   if (!line || line.pv.length === 0) {
     throw new ReviewEngineError(`Missing MultiPV line for ply ${position.ply}`);
   }
@@ -59,8 +53,7 @@ function bestLine(position: PositionEval): EngineLine {
 }
 
 function secondLine(position: PositionEval): EngineLine | undefined {
-  const sorted = [...position.lines].sort((a, b) => a.multipv - b.multipv);
-  return sorted[1];
+  return sortedLines(position)[1];
 }
 
 function normalizeUci(uci: string): string {
@@ -231,7 +224,7 @@ export function reviewGame(input: ReviewEngineInput): GameReview {
     });
   }
 
-  const startColor = startColorFromFen(game.initialFen);
+  const startColor = sideToMoveFromFen(game.initialFen);
   const allWhiteWinPercents = graph.map((point) => point.whiteWinPercent);
   const accuracyByColor = gameAccuracy(allWhiteWinPercents, startColor);
 
