@@ -16,31 +16,28 @@ const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
 const MAX_BODY_BYTES = 16_384;
 
-function isAllowedOrigin(origin: string | null, env?: Env): boolean {
-  if (!origin) {
-    return false;
-  }
-  if (env?.ALLOWED_EXTENSION_ID) {
-    const allowedOrigin = `chrome-extension://${env.ALLOWED_EXTENSION_ID}`;
-    if (origin === allowedOrigin) {
-      return true;
-    }
-    try {
-      const url = new URL(origin);
-      return url.hostname === "localhost" || url.hostname === "127.0.0.1";
-    } catch {
-      return false;
-    }
-  }
-  if (origin.startsWith("chrome-extension://")) {
-    return true;
-  }
+function isLocalhostOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
     return url.hostname === "localhost" || url.hostname === "127.0.0.1";
   } catch {
     return false;
   }
+}
+
+function isAllowedOrigin(origin: string | null, env?: Env): boolean {
+  if (!origin) {
+    return false;
+  }
+  if (env?.ALLOWED_EXTENSION_ID) {
+    const allowedOrigin = `chrome-extension://${env.ALLOWED_EXTENSION_ID}`;
+    if (origin === allowedOrigin) return true;
+    return isLocalhostOrigin(origin);
+  }
+  if (origin.startsWith("chrome-extension://")) {
+    return true;
+  }
+  return isLocalhostOrigin(origin);
 }
 
 function corsHeaders(origin: string | null, env?: Env): HeadersInit {
@@ -85,39 +82,37 @@ export function isAuthorized(request: Request, env: Env): boolean {
 
 function isBodyTooLarge(request: Request): boolean {
   const raw = request.headers.get("content-length");
-  if (raw === null) {
-    return false;
-  }
+  if (raw === null) return false;
   const length = Number(raw);
   return Number.isFinite(length) && length > MAX_BODY_BYTES;
 }
 
-async function handleComment(request: Request, env: Env): Promise<Response> {
-  const origin = request.headers.get("Origin");
-
+async function readJsonBody(request: Request, origin: string | null, env: Env): Promise<{ ok: true; body: unknown } | { ok: false; response: Response }> {
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return jsonResponse(400, { error: "JSON inválido." }, origin, env);
+    return { ok: false, response: jsonResponse(400, { error: "JSON inválido." }, origin, env) };
   }
-
   if (JSON.stringify(body).length > MAX_BODY_BYTES) {
-    return jsonResponse(413, { error: "Corpo grande demais." }, origin, env);
+    return { ok: false, response: jsonResponse(413, { error: "Corpo grande demais." }, origin, env) };
   }
+  return { ok: true, body };
+}
 
-  const parsed = parseCommentSlice(body);
+async function handleComment(request: Request, env: Env): Promise<Response> {
+  const origin = request.headers.get("Origin");
+  const parsedBody = await readJsonBody(request, origin, env);
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const parsed = parseCommentSlice(parsedBody.body);
   if (!parsed.ok) {
     return jsonResponse(400, { error: parsed.error }, origin, env);
   }
 
   const result = await requestOpenRouterComment(parsed.slice, env, fetch, request.signal);
   if (!result.ok) {
-    const payload =
-      result.status === 503
-        ? { error: result.message }
-        : { error: result.message };
-    return jsonResponse(result.status, payload, origin, env);
+    return jsonResponse(result.status, { error: result.message }, origin, env);
   }
 
   return jsonResponse(200, { comment: result.comment }, origin, env);
@@ -125,19 +120,10 @@ async function handleComment(request: Request, env: Env): Promise<Response> {
 
 async function handleSummary(request: Request, env: Env): Promise<Response> {
   const origin = request.headers.get("Origin");
+  const parsedBody = await readJsonBody(request, origin, env);
+  if (!parsedBody.ok) return parsedBody.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse(400, { error: "JSON inválido." }, origin, env);
-  }
-
-  if (JSON.stringify(body).length > MAX_BODY_BYTES) {
-    return jsonResponse(413, { error: "Corpo grande demais." }, origin, env);
-  }
-
-  const parsed = parseGameSummarySlice(body);
+  const parsed = parseGameSummarySlice(parsedBody.body);
   if (!parsed.ok) {
     return jsonResponse(400, { error: parsed.error }, origin, env);
   }

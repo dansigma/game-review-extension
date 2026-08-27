@@ -38,13 +38,13 @@ let idleTimer: ReturnType<typeof setTimeout> | null = null;
 function getAlarmsApi(
   chromeApi: OffscreenChrome = globalThis.chrome as unknown as OffscreenChrome,
 ): OffscreenChrome["alarms"] | undefined {
-  return (chromeApi as OffscreenChrome)?.alarms ?? (globalThis.chrome as unknown as OffscreenChrome)?.alarms;
+  return chromeApi?.alarms ?? (globalThis.chrome as unknown as OffscreenChrome)?.alarms;
 }
 
 export function closeOffscreenDocument(
   chromeApi: OffscreenChrome = globalThis.chrome as unknown as OffscreenChrome,
 ): Promise<void> {
-  const target = (chromeApi as OffscreenChrome)?.offscreen ?? (globalThis.chrome as unknown as OffscreenChrome)?.offscreen;
+  const target = chromeApi?.offscreen ?? (globalThis.chrome as unknown as OffscreenChrome)?.offscreen;
   return (target?.closeDocument?.() as Promise<void>) ?? Promise.resolve();
 }
 
